@@ -1,0 +1,297 @@
+{
+  "dashboard": {
+    "id": null,
+    "title": "Discovery Service Metrics",
+    "tags": ["discovery", "network", "monitoring"],
+    "timezone": "UTC",
+    "schemaVersion": 36,
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "templating": {
+      "list": [
+        {
+          "name": "service",
+          "type": "constant",
+          "current": {
+            "value": "discovery-service",
+            "text": "discovery-service"
+          }
+        }
+      ]
+    },
+    "annotations": {
+      "list": [
+        {
+          "name": "Deployments",
+          "datasource": "Prometheus",
+          "expr": "count(scans_total{status=\"started\"}) by (job)",
+          "tagKeys": "deployment",
+          "iconColor": "blue"
+        }
+      ]
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "Scan Rate",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "rate(scans_total[5m])",
+            "legendFormat": "{{scan_type}} - {{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "ops",
+            "decimals": 2
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 0, "y": 0}
+      },
+      {
+        "id": 2,
+        "title": "Active Scans",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "active_scans",
+            "legendFormat": "{{scan_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short",
+            "min": 0
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 6, "y": 0}
+      },
+      {
+        "id": 3,
+        "title": "Hosts Discovered (Total)",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "hosts_discovered_total",
+            "legendFormat": "{{scan_type}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 12, "y": 0}
+      },
+      {
+        "id": 4,
+        "title": "Managed Hosts",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "total_managed_hosts",
+            "legendFormat": "Total"
+          },
+          {
+            "expr": "hosts_managed_total",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {"h": 8, "w": 6, "x": 18, "y": 0}
+      },
+      {
+        "id": 5,
+        "title": "Scan Duration by Type",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "rate(scan_duration_seconds_bucket[5m])",
+            "format": "heatmap",
+            "legendFormat": "{{scan_type}}"
+          }
+        ],
+        "dataFormat": "tsbuckets",
+        "yBucketBound": "auto",
+        "gridPos": {"h": 10, "w": 12, "x": 0, "y": 8}
+      },
+      {
+        "id": 6,
+        "title": "Scan Status Distribution",
+        "type": "piechart",
+        "targets": [
+          {
+            "expr": "sum by (status) (scans_total)",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "short"
+          }
+        },
+        "gridPos": {"h": 10, "w": 12, "x": 12, "y": 8}
+      },
+      {
+        "id": 7,
+        "title": "HTTP Request Rate",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(http_requests_total[5m])",
+            "legendFormat": "{{method}} {{endpoint}} - {{status_code}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Requests/sec",
+            "unit": "reqps"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 18}
+      },
+      {
+        "id": 8,
+        "title": "HTTP Request Duration (p95)",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m]))",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Duration",
+            "unit": "s"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 18}
+      },
+      {
+        "id": 9,
+        "title": "Health Check Results",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(health_checks_total[5m])",
+            "legendFormat": "{{status}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Checks/sec",
+            "unit": "ops"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 26}
+      },
+      {
+        "id": 10,
+        "title": "Scanner Availability",
+        "type": "stat",
+        "targets": [
+          {
+            "expr": "scanner_availability",
+            "legendFormat": "{{scanner}}"
+          }
+        ],
+        "fieldConfig": {
+          "defaults": {
+            "unit": "bool",
+            "min": 0,
+            "max": 1,
+            "thresholds": {
+              "steps": [
+                {"color": "red", "value": 0},
+                {"color": "green", "value": 1}
+              ]
+            }
+          }
+        },
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 26}
+      },
+      {
+        "id": 11,
+        "title": "Ports Scanned vs Open",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(ports_scanned_total[5m])",
+            "legendFormat": "Scanned - {{scanner}}"
+          },
+          {
+            "expr": "rate(ports_open_total[5m])",
+            "legendFormat": "Open - {{scanner}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Ports/sec",
+            "unit": "ops"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 0, "y": 34}
+      },
+      {
+        "id": 12,
+        "title": "Job Status Transitions",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(jobs_status_total[5m])",
+            "legendFormat": "{{from_status}} → {{to_status}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Transitions/sec",
+            "unit": "ops"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 12, "x": 12, "y": 34}
+      },
+      {
+        "id": 13,
+        "title": "Error Rate by Component",
+        "type": "graph",
+        "targets": [
+          {
+            "expr": "rate(errors_total[5m])",
+            "legendFormat": "{{error_type}} - {{component}}"
+          }
+        ],
+        "yaxes": [
+          {
+            "label": "Errors/sec",
+            "unit": "ops"
+          }
+        ],
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 42}
+      },
+      {
+        "id": 14,
+        "title": "HTTP Response Size Distribution",
+        "type": "heatmap",
+        "targets": [
+          {
+            "expr": "rate(http_response_size_bytes_bucket[5m])",
+            "format": "heatmap",
+            "legendFormat": "{{method}} {{endpoint}}"
+          }
+        ],
+        "dataFormat": "tsbuckets",
+        "yBucketBound": "auto",
+        "gridPos": {"h": 8, "w": 24, "x": 0, "y": 50}
+      }
+    ]
+  }
+}

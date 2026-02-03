@@ -1,0 +1,145 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "opsai.fullname" . }}-config
+  labels:
+    {{- include "opsai.labels" . | nindent 4 }}
+data:
+  # Environment
+  ENVIRONMENT: {{ .Values.environment | default "production" | quote }}
+  DEBUG: {{ .Values.config.debug | default "false" | quote }}
+  LOG_LEVEL: {{ .Values.config.logLevel | default "INFO" | quote }}
+  
+  # Service Configuration
+  API_PORT: {{ .Values.services.api.port | default "8000" | quote }}
+  WEB_PORT: {{ .Values.services.web.port | default "3000" | quote }}
+  WORKER_CONCURRENCY: {{ .Values.config.workerConcurrency | default "4" | quote }}
+  
+  # Ollama Configuration
+  OLLAMA_BASE_URL: {{ include "opsai.ollamaUrl" . | quote }}
+  OLLAMA_TIMEOUT: {{ .Values.config.ollamaTimeout | default "120" | quote }}
+  DEFAULT_MODEL: {{ .Values.config.defaultModel | default "llama2" | quote }}
+  
+  # Feature Flags
+  ENABLE_MOCK_RESPONSES: {{ .Values.config.enableMockResponses | default "false" | quote }}
+  ENABLE_RATE_LIMITING: {{ .Values.config.enableRateLimiting | default "true" | quote }}
+  ENABLE_AUDIT_LOG: {{ .Values.config.enableAuditLog | default "true" | quote }}
+  
+  # CORS Settings
+  CORS_ORIGINS: {{ .Values.config.corsOrigins | default "*" | quote }}
+  
+  # Monitoring
+  METRICS_ENABLED: {{ .Values.monitoring.enabled | default "true" | quote }}
+  METRICS_PORT: {{ .Values.monitoring.port | default "9090" | quote }}
+  
+  # LLM Model Settings
+  {{- if .Values.config.modelSettings }}
+  {{- range $key, $value := .Values.config.modelSettings }}
+  {{ $key }}: {{ $value | quote }}
+  {{- end }}
+  {{- end }}
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "opsai.fullname" . }}-nginx-config
+  labels:
+    {{- include "opsai.labels" . | nindent 4 }}
+data:
+  nginx.conf: |
+    worker_processes auto;
+    error_log /var/log/nginx/error.log warn;
+    pid /var/run/nginx.pid;
+    
+    events {
+        worker_connections 1024;
+    }
+    
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for"';
+        
+        access_log /var/log/nginx/access.log main;
+        
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        
+        # Gzip
+        gzip on;
+        gzip_vary on;
+        gzip_proxied any;
+        gzip_comp_level 6;
+        gzip_types text/plain text/css text/xml application/json application/javascript application/rss+xml application/atom+xml image/svg+xml;
+        
+        # Rate limiting zone
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        
+        # Upstream backend
+        upstream api_backend {
+            server {{ include "opsai.fullname" . }}-api:8000;
+        }
+        
+        upstream web_backend {
+            server {{ include "opsai.fullname" . }}-web:3000;
+        }
+        
+        server {
+            listen 80;
+            server_name localhost;
+            
+            # Health check endpoint
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+            
+            # API routes with rate limiting
+            location /api/ {
+                limit_req zone=api burst=20 nodelay;
+                proxy_pass http://api_backend/;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection 'upgrade';
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_cache_bypass $http_upgrade;
+            }
+            
+            # WebSocket support for streaming
+            location /api/v1/chat/stream {
+                proxy_pass http://api_backend/api/v1/chat/stream;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_read_timeout 86400;
+            }
+            
+            # Web frontend
+            location / {
+                proxy_pass http://web_backend;
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection 'upgrade';
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_cache_bypass $http_upgrade;
+            }
+        }
+    }

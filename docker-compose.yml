@@ -1,0 +1,400 @@
+version: "3.8"
+
+services:
+  # Infrastructure Layer
+  postgres:
+    image: postgres:16-alpine
+    container_name: opsai-postgres
+    env_file:
+      - .env
+    environment:
+      POSTGRES_USER: ${DB_USER:-opsai}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme}
+      POSTGRES_DB: ${DB_NAME:-opsai}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-opsai}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    networks:
+      - opsai
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: opsai-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - opsai
+    restart: unless-stopped
+
+  qdrant:
+    image: qdrant/qdrant:v1.7.4
+    container_name: opsai-qdrant
+    volumes:
+      - qdrant_data:/qdrant/storage
+    ports:
+      - "6333:6333"
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__LOG_LEVEL: INFO
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:6333/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - opsai
+    restart: unless-stopped
+
+  nats:
+    image: nats:2.10-alpine
+    container_name: opsai-nats
+    command: "-m 8222 -js -sd /data"
+    ports:
+      - "4222:4222"
+      - "8222:8222"
+    volumes:
+      - nats_data:/data
+    networks:
+      - opsai
+    restart: unless-stopped
+
+  # Shared base image for Python services
+  python-base:
+    build:
+      context: ./infra/docker
+      dockerfile: python-base.Dockerfile
+    image: talkai-python-base:latest
+    # This service doesn't run, only builds the base image
+    command: ["echo", "Base image built successfully"]
+    networks:
+      - opsai
+
+  # Backend Services
+  policy-engine:
+    build:
+      context: ./services/policy-engine
+      dockerfile: Dockerfile
+    container_name: opsai-policy-engine
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8003
+      - DB_URL=postgresql+asyncpg://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+    ports:
+      - "8003:8003"
+    depends_on:
+      python-base:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    networks:
+      - opsai
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  audit-service:
+    build:
+      context: ./services/audit-service
+      dockerfile: Dockerfile
+    container_name: opsai-audit-service
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8005
+      - DB_URL=postgresql+asyncpg://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+    ports:
+      - "8005:8005"
+    depends_on:
+      python-base:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    networks:
+      - opsai
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  ai-router:
+    build:
+      context: ./services/ai-router
+      dockerfile: Dockerfile
+    container_name: opsai-ai-router
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8001
+      - DB_URL=postgresql+asyncpg://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6333
+      - NATS_URL=nats://nats:4222
+      - AUDIT_SERVICE_URL=http://audit-service:8005
+    ports:
+      - "8001:8001"
+    depends_on:
+      python-base:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      audit-service:
+        condition: service_started
+    networks:
+      - opsai
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: opsai-api-gateway
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8000
+      - DB_URL=postgresql+asyncpg://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - REDIS_URL=redis://redis:6379
+      - AI_ROUTER_URL=http://ai-router:8001
+      - ACTION_ENGINE_URL=http://action-engine:8002
+      - POLICY_ENGINE_URL=http://policy-engine:8003
+      - AUDIT_SERVICE_URL=http://audit-service:8005
+      - AGENT_SERVICE_URL=http://agent-service:8006
+      - RATE_LIMIT=${RATE_LIMIT_REQUESTS_PER_MINUTE:-100}
+    ports:
+      - "8000:8000"
+    depends_on:
+      python-base:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai-router:
+        condition: service_started
+      policy-engine:
+        condition: service_started
+      audit-service:
+        condition: service_started
+      agent-service:
+        condition: service_started
+    networks:
+      opsai:
+        aliases:
+          - api
+          - api-gateway
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  action-engine:
+    build:
+      context: ./services/action-engine
+      dockerfile: Dockerfile
+    container_name: opsai-action-engine
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8002
+      - DB_URL=postgresql+asyncpg://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - REDIS_URL=redis://redis:6379
+      - POLICY_ENGINE_URL=http://policy-engine:8003
+      - AUDIT_SERVICE_URL=http://audit-service:8005
+      - NATS_URL=nats://nats:4222
+    ports:
+      - "8002:8002"
+    depends_on:
+      python-base:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      policy-engine:
+        condition: service_started
+      audit-service:
+        condition: service_started
+    networks:
+      - opsai
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  ingestion-service:
+    build:
+      context: ./services/ingestion-service
+      dockerfile: Dockerfile
+    container_name: opsai-ingestion-service
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8004
+      - DB_URL=postgresql+asyncpg://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - REDIS_URL=redis://redis:6379
+      - QDRANT_URL=http://qdrant:6333
+      - NATS_URL=nats://nats:4222
+    ports:
+      - "8004:8004"
+    depends_on:
+      python-base:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    networks:
+      - opsai
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  agent-service:
+    build:
+      context: ./services/agent-service
+      dockerfile: Dockerfile
+    container_name: opsai-agent-service
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8006
+      - DB_URL=postgresql+asyncpg://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - REDIS_URL=redis://redis:6379
+      - NATS_URL=nats://nats:4222
+      - AI_ROUTER_URL=http://ai-router:8001
+      - POLICY_ENGINE_URL=http://policy-engine:8003
+      - AUDIT_SERVICE_URL=http://audit-service:8005
+    ports:
+      - "8006:8006"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      ai-router:
+        condition: service_started
+      policy-engine:
+        condition: service_started
+      audit-service:
+        condition: service_started
+    networks:
+      - opsai
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  discovery-service:
+    build:
+      context: ./services/discovery-service
+      dockerfile: Dockerfile
+    container_name: opsai-discovery-service
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8007
+      - DATABASE_URL=postgresql://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - REDIS_URL=redis://redis:6379/1
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+    ports:
+      - "8007:8007"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - opsai
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8007/health')"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Frontend
+  frontend:
+    build:
+      context: ./services/frontend
+      dockerfile: Dockerfile
+    container_name: opsai-frontend
+    env_file:
+      - .env
+    environment:
+      - VITE_API_URL=http://localhost:8000
+      - VITE_WS_URL=ws://localhost:8000
+    ports:
+      - "3000:80"
+    depends_on:
+      api-gateway:
+        condition: service_started
+    networks:
+      - opsai
+    restart: unless-stopped
+
+volumes:
+  postgres_data:
+  redis_data:
+  qdrant_data:
+  nats_data:
+
+networks:
+  opsai:
+    driver: bridge

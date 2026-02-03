@@ -1,0 +1,35 @@
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: opsai
+  labels:
+    name: opsai
+    environment: production
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: opsai-config
+  namespace: opsai
+data:
+  ENVIRONMENT: "production"
+  LOG_LEVEL: "info"
+  DATABASE_HOST: "postgres"
+  DATABASE_PORT: "5432"
+  DATABASE_NAME: "opsai"
+  REDIS_HOST: "redis"
+  REDIS_PORT: "6379"
+  QDRANT_HOST: "qdrant"
+  QDRANT_PORT: "6333"
+  API_GATEWAY_URL: "http://api-gateway:8000"
+  AI_ROUTER_URL: "http://ai-router:8001"
+  ACTION_ENGINE_URL: "http://action-engine:8002"
+  POLICY_ENGINE_URL: "http://policy-engine:8003"
+  INGESTION_SERVICE_URL: "http://ingestion-service:8004"
+  AUDIT_SERVICE_URL: "http://audit-service:8005"
+  JWT_ALGORITHM: "HS256"
+  JWT_ACCESS_TOKEN_EXPIRE_MINUTES: "30"
+  CORS_ORIGINS: "*"
+  MAX_CONCURRENT_REQUESTS: "100"
+  RATE_LIMIT_PER_MINUTE: "1000"

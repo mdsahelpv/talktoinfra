@@ -1,0 +1,22 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: opsai
+
+resources:
+  - 00-namespace-config.yaml
+  - 01-secrets.yaml
+  - 02-pvc.yaml
+  - 03-statefulsets.yaml
+  - 04-services-data.yaml
+  - 05-deployment-api-gateway.yaml
+  - 06-deployments-core.yaml
+  - 07-deployments-services.yaml
+  - 08-deployments-frontend.yaml
+  - 09-hpa.yaml
+  - 10-ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/name: opsai
+  app.kubernetes.io/part-of: opsai-platform
+  app.kubernetes.io/managed-by: kustomize

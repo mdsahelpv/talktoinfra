@@ -1,0 +1,135 @@
+{{/* API Service */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opsai.fullname" . }}-api
+  labels:
+    {{- include "opsai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+spec:
+  type: ClusterIP
+  ports:
+    - port: 8000
+      targetPort: http
+      protocol: TCP
+      name: http
+    - port: 9090
+      targetPort: metrics
+      protocol: TCP
+      name: metrics
+  selector:
+    {{- include "opsai.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: api
+
+---
+{{/* Web Frontend Service */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opsai.fullname" . }}-web
+  labels:
+    {{- include "opsai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  type: ClusterIP
+  ports:
+    - port: 3000
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "opsai.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+
+---
+{{/* Nginx Service */}}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opsai.fullname" . }}-nginx
+  labels:
+    {{- include "opsai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx
+{{- if eq .Values.services.nginx.service.type "LoadBalancer" }}
+  annotations:
+    {{- toYaml .Values.services.nginx.service.annotations | nindent 4 }}
+{{- end }}
+spec:
+  type: {{ .Values.services.nginx.service.type | default "ClusterIP" }}
+  ports:
+    - port: {{ .Values.services.nginx.service.port | default 80 }}
+      targetPort: http
+      protocol: TCP
+      name: http
+      {{- if eq .Values.services.nginx.service.type "NodePort" }}
+      nodePort: {{ .Values.services.nginx.service.nodePort }}
+      {{- end }}
+  selector:
+    {{- include "opsai.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: nginx
+
+---
+{{/* PostgreSQL Service */}}
+{{- if .Values.postgresql.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opsai.fullname" . }}-postgres
+  labels:
+    {{- include "opsai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+spec:
+  type: ClusterIP
+  ports:
+    - port: 5432
+      targetPort: postgres
+      protocol: TCP
+      name: postgres
+  selector:
+    {{- include "opsai.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: postgres
+{{- end }}
+
+---
+{{/* Redis Service */}}
+{{- if .Values.redis.enabled }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opsai.fullname" . }}-redis
+  labels:
+    {{- include "opsai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+spec:
+  type: ClusterIP
+  ports:
+    - port: 6379
+      targetPort: redis
+      protocol: TCP
+      name: redis
+  selector:
+    {{- include "opsai.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: redis
+{{- end }}
+
+---
+{{/* Ollama Service */}}
+{{- if and .Values.ollama.enabled (not .Values.ollama.external.enabled) }}
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "opsai.fullname" . }}-ollama
+  labels:
+    {{- include "opsai.labels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+spec:
+  type: ClusterIP
+  ports:
+    - port: 11434
+      targetPort: http
+      protocol: TCP
+      name: http
+  selector:
+    {{- include "opsai.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: ollama
+{{- end }}

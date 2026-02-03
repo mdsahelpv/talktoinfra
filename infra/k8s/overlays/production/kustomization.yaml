@@ -1,0 +1,33 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: opsai
+
+resources:
+  - ../../base
+
+patches:
+  - path: configmap-patch.yaml
+  - path: replicas-patch.yaml
+
+images:
+  - name: opsai/api-gateway
+    newTag: v1.0.0
+  - name: opsai/ai-router
+    newTag: v1.0.0
+  - name: opsai/action-engine
+    newTag: v1.0.0
+  - name: opsai/policy-engine
+    newTag: v1.0.0
+  - name: opsai/ingestion-service
+    newTag: v1.0.0
+  - name: opsai/audit-service
+    newTag: v1.0.0
+  - name: opsai/frontend
+    newTag: v1.0.0
+
+namePrefix: prod-
+
+commonLabels:
+  environment: production
+  app.kubernetes.io/instance: prod

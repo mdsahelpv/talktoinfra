@@ -1,0 +1,25 @@
+apiVersion: v2
+name: opsai
+description: AI-Driven Infrastructure Operations Platform
+version: 1.0.0
+appVersion: "1.0.0"
+keywords:
+  - ai
+  - infrastructure
+  - operations
+  - kubernetes
+home: https://github.com/yourorg/opsai
+sources:
+  - https://github.com/yourorg/opsai
+maintainers:
+  - name: Platform Team
+    email: platform@company.com
+dependencies:
+  - name: postgresql
+    version: 13.2.0
+    repository: https://charts.bitnami.com/bitnami
+    condition: postgresql.enabled
+  - name: redis
+    version: 18.6.0
+    repository: https://charts.bitnami.com/bitnami
+    condition: redis.enabled
