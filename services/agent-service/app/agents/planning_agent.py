@@ -3,15 +3,12 @@ Planning Agent for creating execution plans with risk assessment.
 Generates plans only - safe for auto-execution.
 """
 
-import json
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from enum import Enum
 from datetime import datetime
 
 from app.tools.registry import ToolRegistry, get_registry
-from app.tools.definitions import ToolDefinition
-from app.agents.base import BaseAgent
 
 
 class PlanStepType(str, Enum):
@@ -330,7 +327,7 @@ class PlanningAgent:
             if "image" in parameters:
                 param_desc.append(f"image={parameters['image']}")
             if "config" in parameters:
-                param_desc.append(f"config updates")
+                param_desc.append("config updates")
 
             if param_desc:
                 desc += f" with parameters: {', '.join(param_desc)}"

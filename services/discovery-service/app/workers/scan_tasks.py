@@ -2,10 +2,7 @@
 Celery tasks for scan execution.
 """
 
-from celery import shared_task
 from app.workers.celery_app import celery_app
-from app.services.scan_orchestrator import ScanOrchestrator
-from app.services.job_manager import JobManager
 
 
 @celery_app.task(bind=True)
@@ -29,9 +26,9 @@ def cleanup_old_scans():
     import asyncio
     from app.config import get_settings
     from datetime import datetime, timedelta
-    from sqlalchemy import delete, select
+    from sqlalchemy import delete
     from app.database import AsyncSessionLocal
-    from app.models import ScanJob, DiscoveredHost, HostHealthCheck
+    from app.models import ScanJob
 
     settings = get_settings()
     cutoff_date = datetime.utcnow() - timedelta(

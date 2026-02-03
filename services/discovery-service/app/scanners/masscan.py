@@ -3,7 +3,6 @@ Masscan scanner wrapper - Ultra-fast SYN scanner.
 """
 
 import asyncio
-import ipaddress
 import json
 import os
 import shutil

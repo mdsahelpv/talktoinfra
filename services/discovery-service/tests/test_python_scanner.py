@@ -4,14 +4,12 @@ Unit tests for PythonAsyncScanner.
 
 import asyncio
 import socket
-from datetime import datetime
-from typing import Any, Dict, List, Optional
-from unittest.mock import AsyncMock, MagicMock, Mock, patch
+from typing import Any, Dict, List
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
 from app.scanners.base import (
-    DiscoveredHost,
     ScanCancelledError,
     ScanConfig,
     ScanPort,
@@ -298,9 +296,9 @@ class TestServiceBannerGrabbing:
                 service_name, _ = await python_scanner._detect_service(
                     mock_reader, mock_writer, port
                 )
-            assert service_name == expected_service, (
-                f"Port {port} should map to {expected_service}"
-            )
+            assert (
+                service_name == expected_service
+            ), f"Port {port} should map to {expected_service}"
 
     @pytest.mark.asyncio
     async def test_unknown_port_service_mapping(

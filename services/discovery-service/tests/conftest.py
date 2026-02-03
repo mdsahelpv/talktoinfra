@@ -1,16 +1,21 @@
 """
 Test fixtures and configuration for discovery service API tests.
+
+These fixtures use real PostgreSQL database connections via testcontainers
+instead of mocks for proper integration testing.
 """
 
 import uuid
 from datetime import datetime, timedelta
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, patch
+from typing import Any, Dict, List, AsyncGenerator, Optional
 
 import pytest
+import pytest_asyncio
 from fastapi.testclient import TestClient
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.main import app
+from app.models import Base, DiscoveredHost, DiscoveredPort, ManagedHost, ScanJob
 from app.schemas import (
     DiscoveredHostSchema,
     ManagedHostSchema,
@@ -19,7 +24,9 @@ from app.schemas import (
 )
 
 
-# ============== Test Data Fixtures ==============
+# =============================================================================
+# Test Data Fixtures
+# =============================================================================
 
 
 @pytest.fixture
@@ -159,228 +166,170 @@ def sample_managed_host(sample_host_id: uuid.UUID) -> ManagedHostSchema:
     )
 
 
-@pytest.fixture
-def sample_scan_jobs_list(sample_job_id: uuid.UUID) -> List[ScanJobSchema]:
-    """Sample list of scan jobs."""
-    return [
-        ScanJobSchema(
-            id=sample_job_id,
-            status="completed",
-            scan_type="hybrid",
-            progress=100,
-            ip_range="192.168.1.0/24",
-            ports=[22, 80, 443],
-            total_hosts=254,
-            scanned_hosts=254,
-            found_hosts=10,
-            created_by="admin",
-            started_at=datetime.utcnow() - timedelta(hours=2),
-            completed_at=datetime.utcnow() - timedelta(hours=1),
-            error_message=None,
-            config={},
-            created_at=datetime.utcnow() - timedelta(hours=2),
-        ),
-        ScanJobSchema(
-            id=uuid.UUID("aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee"),
-            status="running",
-            scan_type="python",
-            progress=50,
-            ip_range="10.0.0.0/24",
-            ports=[22, 443],
-            total_hosts=254,
-            scanned_hosts=127,
-            found_hosts=3,
-            created_by="admin",
-            started_at=datetime.utcnow() - timedelta(minutes=30),
-            completed_at=None,
-            error_message=None,
-            config={},
-            created_at=datetime.utcnow() - timedelta(minutes=30),
-        ),
-    ]
+# =============================================================================
+# Database Model Fixtures
+# =============================================================================
+
+
+@pytest_asyncio.fixture
+async def create_scan_job(db_session: AsyncSession) -> AsyncGenerator:
+    """Factory fixture to create scan jobs in database."""
+    async def _create(
+        status: str = "pending",
+        scan_type: str = "python",
+        ip_range: str = "192.168.1.0/24",
+        ports: Optional[List[int]] = None,
+        total_hosts: int = 254,
+        created_by: str = "test-user",
+    ) -> ScanJob:
+        ports = ports or [22, 80, 443]
+        job = ScanJob(
+            status=status,
+            scan_type=scan_type,
+            ip_range=ip_range,
+            ports=ports,
+            total_hosts=total_hosts,
+            created_by=created_by,
+            config={"timeout": 2.0},
+        )
+        db_session.add(job)
+        await db_session.commit()
+        await db_session.refresh(job)
+        return job
+    
+    yield _create
+
+
+@pytest_asyncio.fixture
+async def create_managed_host(db_session: AsyncSession) -> AsyncGenerator:
+    """Factory fixture to create managed hosts in database."""
+    async def _create(
+        name: str = "Test Host",
+        ip_address: str = "192.168.1.100",
+        ports: Optional[List[int]] = None,
+        services: Optional[List[str]] = None,
+        status: str = "online",
+        added_by: str = "test-user",
+    ) -> ManagedHost:
+        ports = ports or [22, 80, 443]
+        services = services or ["ssh", "http"]
+        host = ManagedHost(
+            name=name,
+            ip_address=ip_address,
+            ports=ports,
+            services=services,
+            status=status,
+            added_by=added_by,
+        )
+        db_session.add(host)
+        await db_session.commit()
+        await db_session.refresh(host)
+        return host
+    
+    yield _create
+
+
+@pytest_asyncio.fixture
+async def create_discovered_host(db_session: AsyncSession) -> AsyncGenerator:
+    """Factory fixture to create discovered hosts in database."""
+    async def _create(
+        job_id: uuid.UUID,
+        ip_address: str = "192.168.1.100",
+        hostname: str = "test-host",
+        status: str = "alive",
+        response_time_ms: int = 15,
+    ) -> DiscoveredHost:
+        host = DiscoveredHost(
+            job_id=job_id,
+            ip_address=ip_address,
+            hostname=hostname,
+            status=status,
+            response_time_ms=response_time_ms,
+        )
+        db_session.add(host)
+        await db_session.commit()
+        await db_session.refresh(host)
+        return host
+    
+    yield _create
+
+
+@pytest_asyncio.fixture
+async def create_discovered_port(db_session: AsyncSession) -> AsyncGenerator:
+    """Factory fixture to create discovered ports in database."""
+    async def _create(
+        host_id: uuid.UUID,
+        port: int = 22,
+        status: str = "open",
+        service: str = "ssh",
+        service_version: Optional[str] = None,
+        banner: Optional[str] = None,
+        protocol: str = "tcp",
+    ) -> DiscoveredPort:
+        port_obj = DiscoveredPort(
+            host_id=host_id,
+            port=port,
+            status=status,
+            service=service,
+            service_version=service_version,
+            banner=banner,
+            protocol=protocol,
+        )
+        db_session.add(port_obj)
+        await db_session.commit()
+        await db_session.refresh(port_obj)
+        return port_obj
+    
+    yield _create
+
+
+# =============================================================================
+# Test Client Fixtures
+# =============================================================================
 
 
 @pytest.fixture
-def sample_managed_hosts_list(sample_host_id: uuid.UUID) -> List[ManagedHostSchema]:
-    """Sample list of managed hosts."""
-    return [
-        ManagedHostSchema(
-            id=sample_host_id,
-            name="Web Server 1",
-            ip_address="192.168.1.10",
-            ports=[80, 443],
-            services=["http", "https"],
-            status="online",
-            last_checked_at=datetime.utcnow(),
-            first_discovered_at=datetime.utcnow() - timedelta(days=30),
-            discovered_by_job_id=uuid.UUID("12345678-1234-5678-1234-567812345678"),
-            added_at=datetime.utcnow() - timedelta(days=30),
-            added_by="admin",
-            notes=None,
-            metadata={},
-        ),
-        ManagedHostSchema(
-            id=uuid.UUID("bbbbbbbb-cccc-dddd-eeee-ffffffffffff"),
-            name="Database Server",
-            ip_address="192.168.1.20",
-            ports=[5432],
-            services=["postgresql"],
-            status="online",
-            last_checked_at=datetime.utcnow() - timedelta(minutes=5),
-            first_discovered_at=datetime.utcnow() - timedelta(days=30),
-            discovered_by_job_id=uuid.UUID("12345678-1234-5678-1234-567812345678"),
-            added_at=datetime.utcnow() - timedelta(days=30),
-            added_by="admin",
-            notes="Primary database",
-            metadata={"priority": "high"},
-        ),
-    ]
-
-
-# ============== Mock Service Fixtures ==============
-
-
-@pytest.fixture
-def mock_job_manager():
-    """Mock job manager."""
-    manager = MagicMock()
-    manager.get_job = AsyncMock()
-    manager.list_jobs = AsyncMock()
-    manager.get_job_results = AsyncMock()
-    manager.delete_job = AsyncMock()
-    manager.create_job = AsyncMock()
-    manager.update_job_status = AsyncMock()
-    manager.cancel_job = AsyncMock()
-    return manager
-
-
-@pytest.fixture
-def mock_host_manager():
-    """Mock host manager."""
-    manager = MagicMock()
-    manager.get_host = AsyncMock()
-    manager.list_hosts = AsyncMock()
-    manager.create_host = AsyncMock()
-    manager.add_host_from_discovery = AsyncMock()
-    manager.update_host = AsyncMock()
-    manager.delete_host = AsyncMock()
-    manager.get_host_count_by_status = AsyncMock()
-    return manager
-
-
-@pytest.fixture
-def mock_orchestrator(mock_job_manager):
-    """Mock scan orchestrator."""
-    orchestrator = MagicMock()
-    orchestrator.execute_scan = AsyncMock()
-    orchestrator.stop_scan = AsyncMock()
-    orchestrator.job_manager = mock_job_manager
-    return orchestrator
-
-
-@pytest.fixture
-def mock_scanner_factory():
-    """Mock scanner factory."""
-    factory = MagicMock()
-    factory.get_available_scanners = MagicMock(
-        return_value=[
-            {
-                "name": "python",
-                "description": "Pure Python async scanner",
-                "available": True,
-                "requires_root": False,
-                "recommended_for": "small networks",
-                "average_speed": "50 hosts/sec",
-            },
-            {
-                "name": "fast",
-                "description": "Masscan-based fast scanner",
-                "available": False,
-                "requires_root": True,
-                "recommended_for": "large networks",
-                "average_speed": "1000 hosts/sec",
-            },
-            {
-                "name": "detailed",
-                "description": "Nmap-based detailed scanner",
-                "available": False,
-                "requires_root": True,
-                "recommended_for": "service detection",
-                "average_speed": "10 hosts/sec",
-            },
-            {
-                "name": "hybrid",
-                "description": "Masscan + Nmap hybrid",
-                "available": False,
-                "requires_root": True,
-                "recommended_for": "comprehensive scans",
-                "average_speed": "500 hosts/sec",
-            },
-        ]
+def test_client(
+    postgres_url: str,
+    redis_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> TestClient:
+    """Create test client with real database connections."""
+    # Override database URL
+    monkeypatch.setenv(
+        "DATABASE_URL", 
+        postgres_url.replace("postgresql+asyncpg://", "postgresql://")
     )
-    return factory
-
-
-# ============== Test Client Fixtures ==============
-
-
-@pytest.fixture
-def test_client(mock_job_manager, mock_host_manager, mock_orchestrator):
-    """Create test client with mocked services."""
-    # Store original state
-    original_job_manager = getattr(app.state, "job_manager", None)
-    original_host_manager = getattr(app.state, "host_manager", None)
-    original_orchestrator = getattr(app.state, "orchestrator", None)
-
-    # Set mock services
-    app.state.job_manager = mock_job_manager
-    app.state.host_manager = mock_host_manager
-    app.state.orchestrator = mock_orchestrator
-
+    monkeypatch.setenv("REDIS_URL", redis_url)
+    monkeypatch.setenv("DEBUG", "true")
+    
     # Create test client
-    client = TestClient(app)
-
-    yield client
-
-    # Restore original state
-    if original_job_manager:
-        app.state.job_manager = original_job_manager
-    if original_host_manager:
-        app.state.host_manager = original_host_manager
-    if original_orchestrator:
-        app.state.orchestrator = original_orchestrator
-
-
-@pytest.fixture
-def client_with_scanner_mock(
-    mock_job_manager, mock_host_manager, mock_orchestrator, mock_scanner_factory
-):
-    """Create test client with mocked scanner factory."""
-    # Store original state
-    original_job_manager = getattr(app.state, "job_manager", None)
-    original_host_manager = getattr(app.state, "host_manager", None)
-    original_orchestrator = getattr(app.state, "orchestrator", None)
-
-    # Set mock services
-    app.state.job_manager = mock_job_manager
-    app.state.host_manager = mock_host_manager
-    app.state.orchestrator = mock_orchestrator
-
-    # Patch scanner factory
-    with patch("app.api.v1.scans.ScannerFactory", mock_scanner_factory):
-        client = TestClient(app)
+    with TestClient(app) as client:
         yield client
 
-    # Restore original state
-    if original_job_manager:
-        app.state.job_manager = original_job_manager
-    if original_host_manager:
-        app.state.host_manager = original_host_manager
-    if original_orchestrator:
-        app.state.orchestrator = original_orchestrator
+
+@pytest.fixture
+def client_with_db(
+    db_engine,
+    postgres_url: str,
+    redis_url: str,
+    monkeypatch: pytest.MonkeyPatch,
+) -> TestClient:
+    """Create test client with database engine."""
+    monkeypatch.setenv(
+        "DATABASE_URL", 
+        postgres_url.replace("postgresql+asyncpg://", "postgresql://")
+    )
+    monkeypatch.setenv("REDIS_URL", redis_url)
+    monkeypatch.setenv("DEBUG", "true")
+    
+    with TestClient(app) as client:
+        yield client
 
 
-# ============== Helper Fixtures ==============
+# =============================================================================
+# Request Payload Fixtures
+# =============================================================================
 
 
 @pytest.fixture
@@ -446,4 +395,88 @@ def update_host_request():
         "name": "Updated Host Name",
         "notes": "Updated notes",
         "metadata": {"key": "value"},
+    }
+
+
+# =============================================================================
+# Helper Functions
+# =============================================================================
+
+
+@pytest_asyncio.fixture
+async def setup_test_data(
+    db_session: AsyncSession,
+    create_scan_job,
+    create_managed_host,
+    create_discovered_host,
+    create_discovered_port,
+):
+    """Setup comprehensive test data for integration tests."""
+    # Create a completed scan job
+    job = await create_scan_job(
+        status="completed",
+        scan_type="python",
+        ip_range="192.168.1.0/24",
+        ports=[22, 80, 443],
+        total_hosts=254,
+    )
+    
+    # Create discovered hosts
+    host1 = await create_discovered_host(
+        job_id=job.id,
+        ip_address="192.168.1.10",
+        hostname="web-server",
+        status="alive",
+        response_time_ms=10,
+    )
+    
+    await create_discovered_port(
+        host_id=host1.id,
+        port=80,
+        status="open",
+        service="http",
+    )
+    await create_discovered_port(
+        host_id=host1.id,
+        port=443,
+        status="open",
+        service="https",
+    )
+    
+    host2 = await create_discovered_host(
+        job_id=job.id,
+        ip_address="192.168.1.20",
+        hostname="db-server",
+        status="alive",
+        response_time_ms=20,
+    )
+    
+    await create_discovered_port(
+        host_id=host2.id,
+        port=5432,
+        status="open",
+        service="postgresql",
+    )
+    
+    # Create managed hosts from discovered hosts
+    managed1 = await create_managed_host(
+        name="Web Server",
+        ip_address="192.168.1.10",
+        ports=[80, 443],
+        services=["http", "https"],
+        status="online",
+    )
+    
+    managed2 = await create_managed_host(
+        name="Database Server",
+        ip_address="192.168.1.20",
+        ports=[5432],
+        services=["postgresql"],
+        status="online",
+    )
+    
+    return {
+        "job": job,
+        "discovered_hosts": [host1, host2],
+        "managed_hosts": [managed1, managed2],
     }

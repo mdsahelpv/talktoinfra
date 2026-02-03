@@ -4,9 +4,8 @@ Unit tests for MasscanScanner.
 
 import asyncio
 import json
-import os
-from typing import Any, Dict, List
-from unittest.mock import AsyncMock, MagicMock, Mock, mock_open, patch
+from typing import Any, Dict
+from unittest.mock import AsyncMock, Mock, mock_open, patch
 
 import pytest
 
@@ -14,7 +13,6 @@ from app.scanners.base import (
     DiscoveredHost,
     ScanCancelledError,
     ScanConfig,
-    ScanPort,
     ScannerNotAvailableError,
 )
 from app.scanners.masscan import MasscanScanner

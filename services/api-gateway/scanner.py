@@ -189,9 +189,12 @@ class AsyncPortScanner:
                 writer.close()
                 await writer.wait_closed()
 
-                return ScanPort(
-                    port=port, status="open", service=service_name, banner=banner
-                ), response_ms
+                return (
+                    ScanPort(
+                        port=port, status="open", service=service_name, banner=banner
+                    ),
+                    response_ms,
+                )
 
             except asyncio.TimeoutError:
                 return ScanPort(port=port, status="closed"), None

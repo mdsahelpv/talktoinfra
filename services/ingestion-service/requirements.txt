@@ -6,3 +6,5 @@ structlog==23.2.0
 httpx==0.25.2
 qdrant-client==1.6.9
 sentence-transformers==2.2.2
+kubernetes==28.1.0
+tenacity==8.2.3

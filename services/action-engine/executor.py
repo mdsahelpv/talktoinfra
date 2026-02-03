@@ -4,9 +4,8 @@ Handles the actual execution of infrastructure actions.
 """
 
 import asyncio
-import subprocess
 import time
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 import structlog
 

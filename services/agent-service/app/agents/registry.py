@@ -3,14 +3,14 @@ Agent Registry for registering and discovering agents.
 Provides factory pattern for agent creation.
 """
 
-from typing import Any, Dict, List, Optional, Type, Callable
+from typing import Any, Dict, List, Optional, Callable
 from enum import Enum
 import structlog
 
-from app.agents.query_agent import QueryAgent, get_query_agent
-from app.agents.analysis_agent import AnalysisAgent, get_analysis_agent
-from app.agents.planning_agent import PlanningAgent, get_planning_agent
-from app.agents.action_agent import ActionAgent, get_action_agent
+from app.agents.query_agent import get_query_agent
+from app.agents.analysis_agent import get_analysis_agent
+from app.agents.planning_agent import get_planning_agent
+from app.agents.action_agent import get_action_agent
 
 logger = structlog.get_logger()
 

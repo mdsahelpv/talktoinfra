@@ -3,9 +3,8 @@ Input validation and security validators for tools.
 """
 
 import re
-from typing import Any, Dict, List, Optional, Set, Tuple, Union
+from typing import List, Optional, Set
 from pydantic import BaseModel, validator, ValidationError
-
 
 # Allowed Kubernetes namespaces - whitelist approach
 ALLOWED_NAMESPACES: Set[str] = {
@@ -93,7 +92,7 @@ class K8sNamespace(BaseModel):
             raise ValueError(f"Namespace '{v}' is not in allowed list")
 
         if len(v) > MAX_RESOURCE_NAME_LENGTH:
-            raise ValueError(f"Namespace name too long")
+            raise ValueError("Namespace name too long")
 
         return v
 

@@ -5,27 +5,24 @@ Provides comprehensive audit logging and compliance capabilities.
 Features immutable logs with hashing, query capabilities, and compliance reporting.
 """
 
-import hashlib
 import json
 import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime, timedelta
-from typing import Any, Dict, List, Optional
+from typing import List, Optional
 
 import structlog
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from config import Settings, get_settings
+from config import get_settings
 from models import (
     AuditLogEntry,
     AuditLogRequest,
     AuditQueryRequest,
     AuditQueryResponse,
-    AuditExportRequest,
-    AuditExportResponse,
     ComplianceReport,
     ComplianceReportRequest,
     LogIntegrityReport,
@@ -489,9 +486,9 @@ async def generate_compliance_report(request: ComplianceReportRequest):
             service_breakdown=service_counts,
             high_risk_actions=len(high_risk_actions),
             failed_actions=len(failed_actions),
-            compliance_status="compliant"
-            if len(failed_actions) == 0
-            else "review_required",
+            compliance_status=(
+                "compliant" if len(failed_actions) == 0 else "review_required"
+            ),
             summary=f"Period from {request.start_time.date()} to {request.end_time.date()}: "
             f"{total_actions} actions by {unique_users} users. "
             f"{len(high_risk_actions)} high-risk actions, "

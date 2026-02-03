@@ -5,7 +5,7 @@ Unit tests for NmapScanner.
 import asyncio
 import xml.etree.ElementTree as ET
 from typing import Any, Dict, List
-from unittest.mock import AsyncMock, Mock, mock_open, patch
+from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
@@ -13,7 +13,6 @@ from app.scanners.base import (
     DiscoveredHost,
     ScanCancelledError,
     ScanConfig,
-    ScanPort,
     ScannerNotAvailableError,
 )
 from app.scanners.nmap import NmapScanner

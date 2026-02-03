@@ -4,16 +4,14 @@ ALWAYS requires dry-run + approval - NEVER auto-executes.
 Implements strict safety controls for all infrastructure changes.
 """
 
-import json
 import uuid
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 from dataclasses import dataclass
 from datetime import datetime
 from enum import Enum
 import structlog
 
 from app.tools.registry import ToolRegistry, get_registry
-from app.tools.definitions import ToolDefinition
 
 logger = structlog.get_logger()
 
@@ -154,9 +152,9 @@ class ActionResult:
             "target": self.target,
             "resource_type": self.resource_type,
             "namespace": self.namespace,
-            "dry_run_result": self.dry_run_result.to_dict()
-            if self.dry_run_result
-            else None,
+            "dry_run_result": (
+                self.dry_run_result.to_dict() if self.dry_run_result else None
+            ),
             "dry_run_completed": self.dry_run_completed,
             "requires_approval": self.requires_approval,
             "approval_id": self.approval_id,
@@ -172,9 +170,9 @@ class ActionResult:
             "rollback_result": self.rollback_result,
             "created_at": self.created_at.isoformat(),
             "updated_at": self.updated_at.isoformat(),
-            "completed_at": self.completed_at.isoformat()
-            if self.completed_at
-            else None,
+            "completed_at": (
+                self.completed_at.isoformat() if self.completed_at else None
+            ),
         }
 
 

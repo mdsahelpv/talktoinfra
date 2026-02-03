@@ -1,0 +1,124 @@
+version: "3.8"
+
+# Test Infrastructure for CI/CD and Local Testing
+# This compose file provides ephemeral PostgreSQL, Redis, and Qdrant for tests
+
+services:
+  # Test PostgreSQL Database
+  postgres-test:
+    image: postgres:16-alpine
+    container_name: opsai-postgres-test
+    environment:
+      POSTGRES_USER: testuser
+      POSTGRES_PASSWORD: testpass
+      POSTGRES_DB: testdb
+    ports:
+      - "5433:5432"  # Different port to avoid conflicts
+    tmpfs:
+      - /var/lib/postgresql/data  # Store data in RAM for speed
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U testuser -d testdb"]
+      interval: 2s
+      timeout: 3s
+      retries: 5
+    networks:
+      - opsai-test
+
+  # Test Redis Instance
+  redis-test:
+    image: redis:7-alpine
+    container_name: opsai-redis-test
+    command: redis-server --appendonly no --maxmemory 256mb --maxmemory-policy allkeys-lru
+    ports:
+      - "6380:6379"  # Different port to avoid conflicts
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 2s
+      timeout: 3s
+      retries: 5
+    networks:
+      - opsai-test
+
+  # Test Qdrant (Vector Database)
+  qdrant-test:
+    image: qdrant/qdrant:v1.7.4
+    container_name: opsai-qdrant-test
+    ports:
+      - "6334:6333"  # Different port to avoid conflicts
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__LOG_LEVEL: ERROR
+    tmpfs:
+      - /qdrant/storage  # Store data in RAM for speed
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:6333/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 5
+    networks:
+      - opsai-test
+
+  # Test NATS (Message Queue)
+  nats-test:
+    image: nats:2.10-alpine
+    container_name: opsai-nats-test
+    command: "-m 8223 -js -sd /data"  # Different monitoring port
+    ports:
+      - "4223:4222"  # Different port to avoid conflicts
+      - "8223:8222"  # Different monitoring port
+    tmpfs:
+      - /data  # Store data in RAM for speed
+    networks:
+      - opsai-test
+
+  # Test Runner Container
+  test-runner:
+    build:
+      context: ..
+      dockerfile: infra/docker/python-test.Dockerfile
+    container_name: opsai-test-runner
+    environment:
+      # Database
+      DATABASE_URL: postgresql://testuser:testpass@postgres-test:5432/testdb
+      DB_URL: postgresql+asyncpg://testuser:testpass@postgres-test:5432/testdb
+      
+      # Redis
+      REDIS_URL: redis://redis-test:6379/0
+      
+      # Qdrant
+      QDRANT_URL: http://qdrant-test:6333
+      
+      # NATS
+      NATS_URL: nats://nats-test:4222
+      
+      # Service Configuration
+      DEBUG: "true"
+      SERVICE_PORT: "8000"
+      JWT_SECRET: "test-secret-key-for-testing-only"
+      JWT_ALGORITHM: "HS256"
+      
+      # Scanner Configuration (use system defaults)
+      MASSCAN_PATH: "/usr/bin/masscan"
+      NMAP_PATH: "/usr/bin/nmap"
+      
+      # Test Configuration
+      PYTEST_CURRENT_TEST: "1"
+      PYTHONPATH: "/app"
+    volumes:
+      - ../:/app
+      - /app/venv  # Exclude venv from volume
+    working_dir: /app
+    depends_on:
+      postgres-test:
+        condition: service_healthy
+      redis-test:
+        condition: service_healthy
+      qdrant-test:
+        condition: service_healthy
+    networks:
+      - opsai-test
+    command: ["./scripts/run-tests.sh"]
+
+networks:
+  opsai-test:
+    driver: bridge

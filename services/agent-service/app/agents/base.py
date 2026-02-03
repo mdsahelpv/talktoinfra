@@ -4,10 +4,9 @@ Abstract base that defines the common interface and safety patterns.
 """
 
 from abc import ABC, abstractmethod
-from typing import Any, Dict, List, Optional
+from typing import Any, List
 from datetime import datetime
 import structlog
-import asyncio
 
 from ...app.config import Settings
 from ...models import (
@@ -98,9 +97,11 @@ class BaseAgent(ABC):
                     await self.audit.log_task_failed(task, safety_result.reason)
                     return TaskResult.failed(
                         reason=f"Safety check failed: {safety_result.reason}",
-                        safety_result=safety_result.to_dict()
-                        if hasattr(safety_result, "to_dict")
-                        else {},
+                        safety_result=(
+                            safety_result.to_dict()
+                            if hasattr(safety_result, "to_dict")
+                            else {}
+                        ),
                     )
 
                 # Check if approval required
@@ -245,7 +246,6 @@ class BaseAgent(ABC):
         """
         Create approval request and wait for human decision.
         """
-        from ...models import Approval
 
         approval = await self.safety.create_approval_request(
             task_id=task.id, step=step, safety_result=safety_result

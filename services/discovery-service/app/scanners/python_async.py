@@ -6,7 +6,7 @@ Refactored from api-gateway/scanner.py for database integration.
 import asyncio
 import ipaddress
 import socket
-from typing import Any, Callable, Dict, List, Optional, Set, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import structlog
 

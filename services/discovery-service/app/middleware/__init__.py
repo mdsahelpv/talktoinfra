@@ -118,7 +118,7 @@ class PrometheusMetricsMiddleware(BaseHTTPMiddleware):
 
             return response
 
-        except Exception as e:
+        except Exception:
             # Track failed requests
             metrics.http_requests_total.labels(
                 method=method,

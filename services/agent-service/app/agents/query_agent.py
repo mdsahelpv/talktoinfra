@@ -3,9 +3,8 @@ Query Agent for infrastructure queries.
 Read-only agent safe for auto-execution.
 """
 
-import json
 import re
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 
 from app.tools.registry import ToolRegistry, get_registry

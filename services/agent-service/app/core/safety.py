@@ -14,10 +14,8 @@ from ..app.config import Settings
 from ..models import (
     SafetyResult,
     RiskLevel,
-    SafetyCheck,
     Approval,
     ApprovalStatus,
-    Task,
 )
 from .audit_logger import AuditLogger
 

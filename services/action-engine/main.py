@@ -5,8 +5,6 @@ Executes infrastructure actions with dry-run support and rollback capabilities.
 Integrates with Policy Engine for validation and supports sandbox execution.
 """
 
-import hashlib
-import json
 import time
 import uuid
 from contextlib import asynccontextmanager
@@ -15,16 +13,13 @@ from typing import Any, Dict, List, Optional
 
 import httpx
 import structlog
-from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, status
+from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
-from pydantic import ValidationError
 
-from config import Settings, get_settings
+from config import get_settings
 from models import (
     ActionRequest,
     ActionResponse,
-    DryRunResult,
-    ActionExecutionResult,
     RollbackResult,
     ActionStatus,
 )
@@ -183,9 +178,11 @@ async def dry_run_action(request: Request, action_req: ActionRequest):
         # Create action record
         action_response = ActionResponse(
             action_id=action_id,
-            status=ActionStatus.PENDING_APPROVAL
-            if requires_approval
-            else ActionStatus.APPROVED,
+            status=(
+                ActionStatus.PENDING_APPROVAL
+                if requires_approval
+                else ActionStatus.APPROVED
+            ),
             action=action_req.action,
             target=action_req.target,
             parameters=action_req.parameters,

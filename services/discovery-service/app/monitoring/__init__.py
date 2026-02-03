@@ -16,7 +16,6 @@ from typing import Generator, Optional
 from prometheus_client import Counter, Gauge, Histogram, generate_latest, REGISTRY
 from prometheus_client.core import CollectorRegistry
 
-
 # Scan duration histogram - tracks scan time by type
 scan_duration_histogram = Histogram(
     "scan_duration_seconds",

@@ -8,7 +8,7 @@ from typing import Any, Dict, Optional
 
 import redis
 import structlog
-from fastapi import HTTPException, Request, Response
+from fastapi import HTTPException, Request
 from starlette.middleware.base import BaseHTTPMiddleware
 
 from app.config import get_settings

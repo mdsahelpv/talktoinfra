@@ -7,7 +7,6 @@ from typing import List, Optional
 from uuid import UUID
 
 from sqlalchemy import select, update
-from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import AsyncSessionLocal
 from app.monitoring import metrics

@@ -3,9 +3,7 @@ Analysis Agent for insights, pattern detection, and trend analysis.
 Read-only agent safe for auto-execution.
 """
 
-import json
-from abc import ABC
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional
 from dataclasses import dataclass
 from datetime import datetime, timedelta
 from enum import Enum
@@ -604,9 +602,11 @@ class AnalysisAgent:
                             "last_24h": recent_24h,
                             "last_7d": recent_7d,
                             "total": len(creation_times),
-                            "oldest": creation_times[0].isoformat()
-                            if creation_times
-                            else None,
+                            "oldest": (
+                                creation_times[0].isoformat()
+                                if creation_times
+                                else None
+                            ),
                         },
                     }
                 )
@@ -636,9 +636,11 @@ class AnalysisAgent:
                             trend = (
                                 "increasing"
                                 if recent_rate > older_rate * 1.2
-                                else "decreasing"
-                                if recent_rate < older_rate * 0.8
-                                else "stable"
+                                else (
+                                    "decreasing"
+                                    if recent_rate < older_rate * 0.8
+                                    else "stable"
+                                )
                             )
 
                             findings.append(

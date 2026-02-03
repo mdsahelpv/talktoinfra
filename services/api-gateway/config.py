@@ -29,7 +29,9 @@ class Settings(BaseSettings):
     action_engine_url: str = "http://localhost:8002"
     policy_engine_url: str = "http://localhost:8003"
     audit_service_url: str = "http://localhost:8005"
+    agent_service_url: str = "http://localhost:8006"
     discovery_service_url: str = "http://localhost:8007"
+    onboarding_service_url: str = "http://localhost:8011"
 
     # Rate Limiting
     rate_limit: int = 100  # requests per minute

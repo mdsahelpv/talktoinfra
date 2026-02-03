@@ -8,12 +8,11 @@ Entry point for all client requests. Handles:
 - Audit logging of all requests
 """
 
-import os
 import time
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
-from typing import List, Optional
+from typing import Optional
 
 import httpx
 import structlog
@@ -42,10 +41,6 @@ from models import (
     ActionRequest,
     ActionResponse,
     UserLogin,
-    UserCreate,
-    UserResponse,
-    ConversationCreate,
-    ConversationResponse,
 )
 from config import Settings, get_settings
 
@@ -487,141 +482,55 @@ async def get_infrastructure(
     credentials: HTTPAuthorizationCredentials = Depends(security),
     settings: Settings = Depends(get_settings),
 ):
-    """Get infrastructure details that the AI knows about."""
-    # Verify token
+    """Get infrastructure details from real services.
+
+    Queries the onboarding service for registered clusters and
+    discovery service for managed hosts. No mock data is returned.
+    """
     token = credentials.credentials
     payload = verify_token(token, settings.jwt_secret)
 
-    # Query real service health
-    services = []
-    service_configs = [
-        ("api-gateway", "API Gateway", 8000),
-        ("ai-router", "AI Router", 8001),
-        ("action-engine", "Action Engine", 8002),
-        ("policy-engine", "Policy Engine", 8003),
-        ("ingestion-service", "Ingestion Service", 8004),
-        ("audit-service", "Audit Service", 8005),
-        ("agent-service", "Agent Service", 8006),
-    ]
-
-    healthy_count = 0
-    for svc_id, svc_name, port in service_configs:
-        try:
-            import httpx
-
-            async with httpx.AsyncClient(timeout=2.0) as client:
-                response = await client.get(f"http://localhost:{port}/health")
-                if response.status_code == 200:
-                    health_data = response.json()
-                    services.append(
-                        {
-                            "id": svc_id,
-                            "name": svc_name,
-                            "type": "service",
-                            "cluster": "local",
-                            "namespace": "default",
-                            "status": health_data.get("status", "unknown"),
-                            "replicas": 1,
-                            "endpoint": f"http://localhost:{port}",
-                            "health": health_data,
-                        }
-                    )
-                    if health_data.get("status") == "healthy":
-                        healthy_count += 1
-                else:
-                    services.append(
-                        {
-                            "id": svc_id,
-                            "name": svc_name,
-                            "type": "service",
-                            "cluster": "local",
-                            "namespace": "default",
-                            "status": "unhealthy",
-                            "replicas": 1,
-                            "endpoint": f"http://localhost:{port}",
-                            "error": f"HTTP {response.status_code}",
-                        }
-                    )
-        except Exception as e:
-            services.append(
-                {
-                    "id": svc_id,
-                    "name": svc_name,
-                    "type": "service",
-                    "cluster": "local",
-                    "namespace": "default",
-                    "status": "unreachable",
-                    "replicas": 0,
-                    "endpoint": f"http://localhost:{port}",
-                    "error": str(e),
-                }
-            )
-
-    # Query Docker containers (infrastructure services)
-    containers = []
+    # Query clusters from onboarding service
+    clusters = []
     try:
-        import subprocess
-
-        result = subprocess.run(
-            ["docker", "ps", "--format", "{{.Names}}|{{.Status}}|{{.Ports}}"],
-            capture_output=True,
-            text=True,
-            timeout=5,
+        headers = {"Authorization": f"Bearer {token}"}
+        response = await http_client.get(
+            f"{settings.onboarding_service_url}/api/v1/clusters",
+            headers=headers,
+            timeout=10.0,
         )
-        if result.returncode == 0:
-            for line in result.stdout.strip().split("\n"):
-                if line and "opsai-" in line:
-                    parts = line.split("|")
-                    if len(parts) >= 2:
-                        containers.append(
-                            {
-                                "name": parts[0],
-                                "status": parts[1],
-                                "ports": parts[2] if len(parts) > 2 else "",
-                                "type": "infrastructure",
-                            }
-                        )
+        if response.status_code == 200:
+            clusters_data = response.json()
+            clusters = clusters_data.get("clusters", [])
+    except httpx.RequestError as e:
+        logger.warning("onboarding_service_unavailable", error=str(e))
     except Exception as e:
-        logger.warning("docker_query_failed", error=str(e))
+        logger.error("clusters_query_failed", error=str(e))
 
-    # Get system resources
-    resources = {"compute": {}, "network": {}}
+    # Query managed hosts from discovery service
+    hosts = []
     try:
-        import psutil
-
-        cpu_count = psutil.cpu_count()
-        cpu_percent = psutil.cpu_percent(interval=0.1)
-        memory = psutil.virtual_memory()
-        disk = psutil.disk_usage("/")
-
-        resources["compute"] = {
-            "total_cpu_cores": cpu_count,
-            "cpu_usage_percent": cpu_percent,
-            "total_memory_gb": round(memory.total / (1024**3), 2),
-            "used_memory_gb": round(memory.used / (1024**3), 2),
-            "memory_usage_percent": memory.percent,
-            "total_storage_gb": round(disk.total / (1024**3), 2),
-            "used_storage_gb": round(disk.used / (1024**3), 2),
-            "storage_usage_percent": disk.percent,
-        }
+        headers = {"Authorization": f"Bearer {token}"}
+        response = await http_client.get(
+            f"{settings.discovery_service_url}/api/v1/hosts",
+            headers=headers,
+            timeout=10.0,
+        )
+        if response.status_code == 200:
+            hosts_data = response.json()
+            hosts = hosts_data.get("hosts", [])
+    except httpx.RequestError as e:
+        logger.warning("discovery_service_unavailable", error=str(e))
     except Exception as e:
-        logger.warning("resource_query_failed", error=str(e))
-        resources["compute"] = {
-            "error": "Unable to query system resources",
-            "details": str(e),
-        }
+        logger.error("hosts_query_failed", error=str(e))
 
-    # Build response
+    # Build response with real data only
     infra_data = {
-        "environment": "local-development",
-        "services": services,
-        "infrastructure_containers": containers,
-        "resources": resources,
+        "clusters": clusters,
+        "hosts": hosts,
         "summary": {
-            "total_services": len(services),
-            "healthy_services": healthy_count,
-            "unhealthy_services": len(services) - healthy_count,
-            "infrastructure_containers": len(containers),
+            "total_clusters": len(clusters),
+            "total_hosts": len(hosts),
             "last_updated": datetime.utcnow().isoformat() + "Z",
         },
     }
@@ -629,8 +538,8 @@ async def get_infrastructure(
     logger.info(
         "infrastructure_queried",
         username=payload.get("username"),
-        services_total=len(services),
-        services_healthy=healthy_count,
+        clusters_count=len(clusters),
+        hosts_count=len(hosts),
     )
     return infra_data
 

@@ -3,8 +3,7 @@ Kubernetes read-only tools for infrastructure queries.
 All operations are read-only and safe for auto-execution.
 """
 
-import asyncio
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, Optional
 from kubernetes import client, config
 from kubernetes.client.exceptions import ApiException
 
@@ -12,9 +11,6 @@ from app.tools.validators import (
     PodQueryInput,
     LogQueryInput,
     DescribeResourceInput,
-    validate_k8s_resource_name,
-    validate_namespace,
-    ValidationResult,
 )
 
 
@@ -103,9 +99,11 @@ async def list_pods(
                     "status": pod.status.phase,
                     "ip": pod.status.pod_ip,
                     "node": pod.spec.node_name,
-                    "created": pod.metadata.creation_timestamp.isoformat()
-                    if pod.metadata.creation_timestamp
-                    else None,
+                    "created": (
+                        pod.metadata.creation_timestamp.isoformat()
+                        if pod.metadata.creation_timestamp
+                        else None
+                    ),
                     "labels": pod.metadata.labels or {},
                     "containers": [c.name for c in pod.spec.containers],
                 }
@@ -148,9 +146,11 @@ async def get_pod(
                 "status": pod.status.phase,
                 "ip": pod.status.pod_ip,
                 "node": pod.spec.node_name,
-                "created": pod.metadata.creation_timestamp.isoformat()
-                if pod.metadata.creation_timestamp
-                else None,
+                "created": (
+                    pod.metadata.creation_timestamp.isoformat()
+                    if pod.metadata.creation_timestamp
+                    else None
+                ),
                 "labels": pod.metadata.labels or {},
                 "annotations": pod.metadata.annotations or {},
                 "containers": [
@@ -164,20 +164,22 @@ async def get_pod(
                     }
                     for c in pod.spec.containers
                 ],
-                "volumes": [v.name for v in pod.spec.volumes]
-                if pod.spec.volumes
-                else [],
-                "conditions": [
-                    {
-                        "type": c.type,
-                        "status": c.status,
-                        "reason": c.reason,
-                        "message": c.message,
-                    }
-                    for c in pod.status.conditions
-                ]
-                if pod.status.conditions
-                else [],
+                "volumes": (
+                    [v.name for v in pod.spec.volumes] if pod.spec.volumes else []
+                ),
+                "conditions": (
+                    [
+                        {
+                            "type": c.type,
+                            "status": c.status,
+                            "reason": c.reason,
+                            "message": c.message,
+                        }
+                        for c in pod.status.conditions
+                    ]
+                    if pod.status.conditions
+                    else []
+                ),
             },
         }
 
@@ -374,9 +376,11 @@ def _format_pod(pod: Any) -> Dict[str, Any]:
         "status": pod.status.phase,
         "ip": pod.status.pod_ip,
         "node": pod.spec.node_name,
-        "created": pod.metadata.creation_timestamp.isoformat()
-        if pod.metadata.creation_timestamp
-        else None,
+        "created": (
+            pod.metadata.creation_timestamp.isoformat()
+            if pod.metadata.creation_timestamp
+            else None
+        ),
         "labels": pod.metadata.labels or {},
         "annotations": pod.metadata.annotations or {},
         "containers": [
@@ -401,21 +405,25 @@ def _format_service(svc: Any) -> Dict[str, Any]:
         "type": svc.spec.type,
         "cluster_ip": svc.spec.cluster_ip,
         "external_ips": svc.spec.external_ips,
-        "ports": [
-            {
-                "port": p.port,
-                "target_port": p.target_port,
-                "protocol": p.protocol,
-                "name": p.name,
-            }
-            for p in svc.spec.ports
-        ]
-        if svc.spec.ports
-        else [],
+        "ports": (
+            [
+                {
+                    "port": p.port,
+                    "target_port": p.target_port,
+                    "protocol": p.protocol,
+                    "name": p.name,
+                }
+                for p in svc.spec.ports
+            ]
+            if svc.spec.ports
+            else []
+        ),
         "selector": svc.spec.selector,
-        "created": svc.metadata.creation_timestamp.isoformat()
-        if svc.metadata.creation_timestamp
-        else None,
+        "created": (
+            svc.metadata.creation_timestamp.isoformat()
+            if svc.metadata.creation_timestamp
+            else None
+        ),
     }
 
 
@@ -429,9 +437,11 @@ def _format_deployment(deploy: Any) -> Dict[str, Any]:
         "ready_replicas": deploy.status.ready_replicas,
         "strategy": deploy.spec.strategy.type if deploy.spec.strategy else None,
         "selector": deploy.spec.selector.match_labels if deploy.spec.selector else None,
-        "created": deploy.metadata.creation_timestamp.isoformat()
-        if deploy.metadata.creation_timestamp
-        else None,
+        "created": (
+            deploy.metadata.creation_timestamp.isoformat()
+            if deploy.metadata.creation_timestamp
+            else None
+        ),
         "labels": deploy.metadata.labels or {},
     }
 
@@ -443,9 +453,11 @@ def _format_configmap(cm: Any) -> Dict[str, Any]:
         "namespace": cm.metadata.namespace,
         "data_keys": list(cm.data.keys()) if cm.data else [],
         "binary_data_keys": list(cm.binary_data.keys()) if cm.binary_data else [],
-        "created": cm.metadata.creation_timestamp.isoformat()
-        if cm.metadata.creation_timestamp
-        else None,
+        "created": (
+            cm.metadata.creation_timestamp.isoformat()
+            if cm.metadata.creation_timestamp
+            else None
+        ),
         "labels": cm.metadata.labels or {},
     }
 
@@ -457,9 +469,11 @@ def _format_secret(secret: Any) -> Dict[str, Any]:
         "namespace": secret.metadata.namespace,
         "type": secret.type,
         "data_keys": list(secret.data.keys()) if secret.data else [],
-        "created": secret.metadata.creation_timestamp.isoformat()
-        if secret.metadata.creation_timestamp
-        else None,
+        "created": (
+            secret.metadata.creation_timestamp.isoformat()
+            if secret.metadata.creation_timestamp
+            else None
+        ),
         "labels": secret.metadata.labels or {},
     }
 
@@ -469,17 +483,21 @@ def _format_node(node: Any) -> Dict[str, Any]:
     return {
         "name": node.metadata.name,
         "status": node.status.phase if node.status else None,
-        "addresses": [
-            {"type": addr.type, "address": addr.address}
-            for addr in node.status.addresses
-        ]
-        if node.status and node.status.addresses
-        else [],
+        "addresses": (
+            [
+                {"type": addr.type, "address": addr.address}
+                for addr in node.status.addresses
+            ]
+            if node.status and node.status.addresses
+            else []
+        ),
         "capacity": node.status.capacity if node.status else None,
         "allocatable": node.status.allocatable if node.status else None,
-        "created": node.metadata.creation_timestamp.isoformat()
-        if node.metadata.creation_timestamp
-        else None,
+        "created": (
+            node.metadata.creation_timestamp.isoformat()
+            if node.metadata.creation_timestamp
+            else None
+        ),
         "labels": node.metadata.labels or {},
     }
 
@@ -489,9 +507,11 @@ def _format_namespace(ns: Any) -> Dict[str, Any]:
     return {
         "name": ns.metadata.name,
         "status": ns.status.phase if ns.status else None,
-        "created": ns.metadata.creation_timestamp.isoformat()
-        if ns.metadata.creation_timestamp
-        else None,
+        "created": (
+            ns.metadata.creation_timestamp.isoformat()
+            if ns.metadata.creation_timestamp
+            else None
+        ),
         "labels": ns.metadata.labels or {},
     }
 
@@ -504,9 +524,11 @@ def _format_persistent_volume(pv: Any) -> Dict[str, Any]:
         "access_modes": pv.spec.access_modes if pv.spec else None,
         "status": pv.status.phase if pv.status else None,
         "storage_class": pv.spec.storage_class_name if pv.spec else None,
-        "created": pv.metadata.creation_timestamp.isoformat()
-        if pv.metadata.creation_timestamp
-        else None,
+        "created": (
+            pv.metadata.creation_timestamp.isoformat()
+            if pv.metadata.creation_timestamp
+            else None
+        ),
     }
 
 
@@ -519,10 +541,12 @@ def _format_pvc(pvc: Any) -> Dict[str, Any]:
         "volume_name": pvc.spec.volume_name if pvc.spec else None,
         "access_modes": pvc.spec.access_modes if pvc.spec else None,
         "storage_class": pvc.spec.storage_class_name if pvc.spec else None,
-        "resources": pvc.spec.resources.requests
-        if pvc.spec and pvc.spec.resources
-        else None,
-        "created": pvc.metadata.creation_timestamp.isoformat()
-        if pvc.metadata.creation_timestamp
-        else None,
+        "resources": (
+            pvc.spec.resources.requests if pvc.spec and pvc.spec.resources else None
+        ),
+        "created": (
+            pvc.metadata.creation_timestamp.isoformat()
+            if pvc.metadata.creation_timestamp
+            else None
+        ),
     }

@@ -3,7 +3,6 @@ Sandbox Environment module.
 Provides isolated execution environment for dry-runs.
 """
 
-import time
 from typing import Any, Dict, List
 
 import structlog
@@ -268,9 +267,11 @@ class SandboxEnvironment:
         ]
 
         warnings = [
-            f"Will apply patch: {patch[:100]}..."
-            if len(patch) > 100
-            else f"Will apply patch: {patch}",
+            (
+                f"Will apply patch: {patch[:100]}..."
+                if len(patch) > 100
+                else f"Will apply patch: {patch}"
+            ),
             "Verify patch syntax is correct before executing",
         ]
 

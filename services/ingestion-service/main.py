@@ -6,8 +6,6 @@ Provides semantic search capabilities and background workers for continuous inge
 Integrates with Qdrant for vector storage.
 """
 
-import asyncio
-import hashlib
 import json
 import time
 import uuid
@@ -20,11 +18,10 @@ import structlog
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import Settings, get_settings
+from config import get_settings
 from models import (
     IngestRequest,
     IngestResponse,
-    SearchRequest,
     SearchResponse,
     SearchResult,
     ResourceDocument,

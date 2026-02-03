@@ -5,7 +5,7 @@ Uses Redis for caching and PostgreSQL for persistence.
 
 import json
 import uuid
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import redis.asyncio as redis
@@ -14,7 +14,6 @@ from sqlalchemy import (
     Column,
     DateTime,
     String,
-    create_engine,
     select,
     update,
 )
@@ -168,12 +167,12 @@ class ConversationManager:
                 "title": orm_conv.title,
                 "messages": orm_conv.messages or [],
                 "metadata": orm_conv.meta_data or {},  # Updated column name
-                "created_at": orm_conv.created_at.isoformat()
-                if orm_conv.created_at
-                else None,
-                "updated_at": orm_conv.updated_at.isoformat()
-                if orm_conv.updated_at
-                else None,
+                "created_at": (
+                    orm_conv.created_at.isoformat() if orm_conv.created_at else None
+                ),
+                "updated_at": (
+                    orm_conv.updated_at.isoformat() if orm_conv.updated_at else None
+                ),
             }
 
             # Cache in Redis
@@ -305,12 +304,12 @@ class ConversationManager:
                     "user_id": conv.user_id,
                     "title": conv.title,
                     "message_count": len(conv.messages) if conv.messages else 0,
-                    "created_at": conv.created_at.isoformat()
-                    if conv.created_at
-                    else None,
-                    "updated_at": conv.updated_at.isoformat()
-                    if conv.updated_at
-                    else None,
+                    "created_at": (
+                        conv.created_at.isoformat() if conv.created_at else None
+                    ),
+                    "updated_at": (
+                        conv.updated_at.isoformat() if conv.updated_at else None
+                    ),
                 }
                 for conv in orm_convs
             ]

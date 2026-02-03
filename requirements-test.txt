@@ -1,0 +1,35 @@
+# Test infrastructure requirements for TalkAI Platform
+# Install with: pip install -r requirements-test.txt
+
+# Core testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+pytest-html==4.1.1
+pytest-xdist==3.5.0
+
+# Testcontainers for real database testing
+testcontainers==3.7.8
+testcontainers-postgres==0.0.1
+testcontainers-redis==0.0.1
+testcontainers-core==0.0.1
+
+# HTTP client for testing
+httpx==0.26.0
+requests==2.31.0
+
+# Type checking and linting
+mypy==1.8.0
+ruff==0.1.14
+black==23.12.1
+
+# Coverage reporting
+coverage==7.4.1
+
+# Mocking utilities (for external APIs only)
+respx==0.20.2  # For mocking HTTPX
+responses==0.24.1  # For mocking requests
+
+# Test data generation
+factory-boy==3.3.0
+faker==22.4.0

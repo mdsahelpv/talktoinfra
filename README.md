@@ -252,6 +252,84 @@ See `.env.example` for full configuration options.
 
 ---
 
+## 🚫 No Mock Data Policy
+
+**Critical**: This codebase strictly prohibits mock data in production code.
+
+### Policy
+
+Mock data, mock functions, and testing utilities **must not** exist in production code. They are allowed **only** in:
+- Test files (`test_*.py`, `*_test.py`)
+- Test directories (`tests/`, `test/`)
+- Test fixtures and configuration
+
+### What's Prohibited
+
+Production code must not contain:
+- Mock functions (`_get_mock_resources`, `get_mock_namespaces`, etc.)
+- Mock variables (`mock_data`, `MOCK_DATA`, `fake_data`, etc.)
+- Testing utilities (`MagicMock`, `Mock`, `@patch` decorators)
+- Hardcoded "test-" prefixes in resource identifiers
+- JSON/YAML mock data files outside of test directories
+
+### Enforcement
+
+We enforce this policy through multiple safeguards:
+
+1. **Pre-Commit Hooks**: Automatically blocks commits with mock data in production files
+2. **CI/CD Pipeline**: First job in CI runs mock detection and fails the build if found
+3. **Detection Script**: `scripts/check-no-mock.py` scans for mock patterns
+
+### Example Violations
+
+```python
+# ❌ WRONG - Mock data in production code
+async def _get_mock_resources():
+    return [{"name": "mock-pod", "status": "running"}]
+
+mock_data = {
+    "namespaces": ["test-ns-1", "test-ns-2"]
+}
+
+from unittest.mock import MagicMock
+mock_client = MagicMock()
+```
+
+```python
+# ✅ CORRECT - Production code uses real data
+async def get_resources_from_cluster(cluster_id: str):
+    client = kubernetes_client.get_client(cluster_id)
+    return await client.list_pods()
+```
+
+```python
+# ✅ CORRECT - Mock data only in tests
+def test_resource_service():
+    mock_data = [{"name": "test-pod", "status": "running"}]
+    with patch("app.services.get_resources") as mock:
+        mock.return_value = mock_data
+        result = service.get_resources()
+        assert result == mock_data
+```
+
+### Bypassing (Not Recommended)
+
+To bypass pre-commit hooks temporarily:
+```bash
+git commit --no-verify
+```
+
+### Why This Matters
+
+- **Safety**: Prevents accidental deployment of mock data to production
+- **Clarity**: Clear separation between production and test code
+- **Quality**: Production code is clean, professional, and focused
+- **Trust**: Developers can trust that production code contains only real logic
+
+See [docs/ADR/ADR-001-no-mock-data.md](docs/ADR/ADR-001-no-mock-data.md) for full Architecture Decision Record.
+
+---
+
 ## 🔐 Security Considerations
 
 ### Authentication

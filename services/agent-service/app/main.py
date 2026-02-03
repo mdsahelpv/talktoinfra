@@ -3,8 +3,6 @@ Agent Service - Main FastAPI Application
 API endpoints for agent execution, task management, and approvals.
 """
 
-import asyncio
-import json
 import uuid
 from contextlib import asynccontextmanager
 from datetime import datetime
@@ -15,7 +13,6 @@ from fastapi import (
     HTTPException,
     WebSocket,
     WebSocketDisconnect,
-    Depends,
     BackgroundTasks,
 )
 from fastapi.middleware.cors import CORSMiddleware
@@ -24,14 +21,13 @@ from pydantic import BaseModel, Field
 import structlog
 
 # Import agent components
-from app.agents.registry import get_agent_registry, AgentType, list_available_agents
+from app.agents.registry import get_agent_registry, list_available_agents
 from app.agents.query_agent import get_query_agent
 from app.agents.analysis_agent import get_analysis_agent, AnalysisType
 from app.agents.planning_agent import get_planning_agent
 from app.agents.action_agent import get_action_agent, ActionStatus
 
 # Import utilities
-from app.tools.registry import get_registry
 from app.config import get_settings
 
 # Configure logging
@@ -519,9 +515,9 @@ async def _execute_action_agent(
             "action": action,
             "target": target,
             "namespace": request.namespace,
-            "dry_run_result": result.dry_run_result.to_dict()
-            if result.dry_run_result
-            else None,
+            "dry_run_result": (
+                result.dry_run_result.to_dict() if result.dry_run_result else None
+            ),
             "impact_analysis": result.impact_analysis.to_dict(),
             "requested_at": datetime.utcnow().isoformat(),
         }
@@ -532,9 +528,9 @@ async def _execute_action_agent(
             "result": result.to_dict(),
             "requires_approval": True,
             "approval_id": approval_id,
-            "dry_run_result": result.dry_run_result.to_dict()
-            if result.dry_run_result
-            else None,
+            "dry_run_result": (
+                result.dry_run_result.to_dict() if result.dry_run_result else None
+            ),
         }
 
     # If dry-run failed
@@ -544,9 +540,9 @@ async def _execute_action_agent(
             "error": result.execution_error or "Dry-run failed",
             "result": result.to_dict(),
             "requires_approval": False,
-            "dry_run_result": result.dry_run_result.to_dict()
-            if result.dry_run_result
-            else None,
+            "dry_run_result": (
+                result.dry_run_result.to_dict() if result.dry_run_result else None
+            ),
         }
 
     return {
@@ -635,14 +631,16 @@ async def approve_action(
                 {
                     "status": action_result.status.value,
                     "updated_at": datetime.utcnow().isoformat(),
-                    "completed_at": datetime.utcnow().isoformat()
-                    if action_result.status
-                    in [
-                        ActionStatus.COMPLETED,
-                        ActionStatus.FAILED,
-                        ActionStatus.ROLLED_BACK,
-                    ]
-                    else None,
+                    "completed_at": (
+                        datetime.utcnow().isoformat()
+                        if action_result.status
+                        in [
+                            ActionStatus.COMPLETED,
+                            ActionStatus.FAILED,
+                            ActionStatus.ROLLED_BACK,
+                        ]
+                        else None
+                    ),
                     "result": action_result.to_dict(),
                 }
             )
@@ -776,9 +774,11 @@ async def list_pending_approvals():
             "target": a["target"],
             "namespace": a["namespace"],
             "requested_at": a["requested_at"],
-            "dry_run_summary": a.get("dry_run_result", {}).get("changes_preview", [])
-            if a.get("dry_run_result")
-            else [],
+            "dry_run_summary": (
+                a.get("dry_run_result", {}).get("changes_preview", [])
+                if a.get("dry_run_result")
+                else []
+            ),
         }
         for aid, a in _approval_store.items()
         if a.get("status") == "pending"

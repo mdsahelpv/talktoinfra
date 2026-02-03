@@ -4,8 +4,6 @@ RAG (Retrieval-Augmented Generation) engine using Qdrant.
 
 from typing import Any, Dict, List, Optional
 
-import httpx
-import numpy as np
 import structlog
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.http.models import Distance, VectorParams

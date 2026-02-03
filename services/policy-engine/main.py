@@ -8,7 +8,7 @@ Features role-based access control, resource-level permissions, and multi-level 
 import time
 import uuid
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 import httpx
@@ -16,16 +16,14 @@ import structlog
 from fastapi import FastAPI, HTTPException, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 
-from config import Settings, get_settings
+from config import get_settings
 from models import (
     PolicyCheckRequest,
     PolicyCheckResponse,
-    ApprovalRequest,
     ApprovalResponse,
     ApprovalStatus,
     Role,
     Permission,
-    UserRoleAssignment,
 )
 from rbac import RBACManager
 from approval_chain import ApprovalChainManager
@@ -189,9 +187,11 @@ async def check_policy(request: Request, check_req: PolicyCheckRequest):
 
         return PolicyCheckResponse(
             allowed=has_permission and resource_check.get("allowed", True),
-            reason=resource_check.get("reason")
-            if not resource_check.get("allowed", True)
-            else None,
+            reason=(
+                resource_check.get("reason")
+                if not resource_check.get("allowed", True)
+                else None
+            ),
             requires_approval=requires_approval,
             approvers=approvers,
             policy_version=resource_check.get("policy_version", "1.0"),

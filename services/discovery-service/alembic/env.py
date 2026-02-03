@@ -38,14 +38,6 @@ if config.config_file_name is not None:
 
 # Target metadata for autogenerate
 # This is the metadata from all models
-from app.models import (
-    ScanJob,
-    DiscoveredHost,
-    DiscoveredPort,
-    ManagedHost,
-    HostHealthCheck,
-    ScanExclusion,
-)  # noqa
 
 target_metadata = Base.metadata
 

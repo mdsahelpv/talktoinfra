@@ -8,7 +8,7 @@ Supports three formats:
 
 import ipaddress
 import re
-from typing import List, Tuple, Union
+from typing import List, Tuple
 
 
 class IPRangeParseError(Exception):

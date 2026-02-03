@@ -4,9 +4,7 @@ Celery tasks for health monitoring.
 
 import asyncio
 from datetime import datetime
-from typing import List
 
-from celery import shared_task
 
 from app.config import get_settings
 from app.monitoring import metrics
@@ -104,7 +102,7 @@ def run_health_checks():
 @celery_app.task
 def cleanup_old_health_checks():
     """Clean up old health check records."""
-    from datetime import datetime, timedelta
+    from datetime import timedelta
     from sqlalchemy import delete
     from app.database import AsyncSessionLocal
     from app.models import HostHealthCheck

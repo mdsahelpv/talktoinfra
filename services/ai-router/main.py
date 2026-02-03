@@ -9,19 +9,17 @@ Core intelligence service that:
 - Manages conversation context
 """
 
-import os
 import time
 import uuid
 from contextlib import asynccontextmanager
 from typing import Dict, List, Optional, Any
 
-import httpx
 import structlog
 from fastapi import FastAPI, HTTPException, BackgroundTasks, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import StreamingResponse
 
-from config import Settings, get_settings
+from config import get_settings
 from intent_classifier import IntentClassifier
 from conversation_manager import ConversationManager
 from rag_engine import RAGEngine
@@ -30,7 +28,6 @@ from models import (
     QueryRequest,
     QueryResponse,
     IntentClassification,
-    ConversationContext,
 )
 
 # Configure logging

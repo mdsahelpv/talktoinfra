@@ -7,7 +7,7 @@ from typing import Any, Dict, List, Optional
 
 import structlog
 
-from models import ApprovalResponse, ApprovalChain, ApprovalChainLevel
+from models import ApprovalResponse, ApprovalChain
 
 logger = structlog.get_logger()
 

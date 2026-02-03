@@ -10,7 +10,6 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
-from sqlalchemy.orm import selectinload
 
 logger = structlog.get_logger()
 
@@ -49,9 +48,9 @@ class AuditLogger:
             success=result.success,
             details={
                 "execution_time_ms": result.execution_time_ms,
-                "steps_executed": len(result.step_results)
-                if result.step_results
-                else 0,
+                "steps_executed": (
+                    len(result.step_results) if result.step_results else 0
+                ),
                 "error": result.error_message,
             },
         )
@@ -75,12 +74,14 @@ class AuditLogger:
             details={
                 "tool_name": tool_call.tool_name,
                 "parameters": tool_call.parameters,
-                "started_at": tool_call.started_at.isoformat()
-                if tool_call.started_at
-                else None,
-                "completed_at": tool_call.completed_at.isoformat()
-                if tool_call.completed_at
-                else None,
+                "started_at": (
+                    tool_call.started_at.isoformat() if tool_call.started_at else None
+                ),
+                "completed_at": (
+                    tool_call.completed_at.isoformat()
+                    if tool_call.completed_at
+                    else None
+                ),
                 "success": tool_call.error is None,
             },
         )

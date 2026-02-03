@@ -4,7 +4,6 @@ Tool registry for managing and discovering tools.
 
 import asyncio
 from typing import Any, Callable, Dict, List, Optional, Set
-from functools import wraps
 
 from app.tools.definitions import ToolDefinition, ToolParameter, create_tool_definition
 

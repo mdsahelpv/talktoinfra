@@ -2,12 +2,10 @@
 Unit tests for ScannerFactory.
 """
 
-from typing import Any, Dict, List
 from unittest.mock import Mock, patch
 
 import pytest
 
-from app.scanners.base import BaseScanner
 from app.scanners.factory import ScannerFactory
 from app.scanners.masscan import MasscanScanner
 from app.scanners.nmap import NmapScanner

@@ -4,7 +4,7 @@ Scan orchestrator - Coordinates multi-stage scans (Masscan -> Nmap).
 
 import asyncio
 import ipaddress
-from typing import Callable, List, Optional
+from typing import List, Optional
 from uuid import UUID
 
 import structlog
@@ -12,8 +12,6 @@ import structlog
 from app.config import get_settings
 from app.monitoring import metrics
 from app.scanners.base import (
-    BaseScanner,
-    DiscoveredHost,
     ScanCancelledError,
     ScanConfig,
     ScanProgress,

@@ -3,7 +3,6 @@ Rollback Manager module.
 Manages rollback points and executes rollback operations.
 """
 
-import json
 import time
 from datetime import datetime
 from typing import Any, Dict, List, Optional
