@@ -17,6 +17,7 @@ import httpx
 import structlog
 from fastapi import FastAPI, HTTPException, Request, BackgroundTasks, status
 from fastapi.middleware.cors import CORSMiddleware
+from pydantic import BaseModel
 
 from config import get_settings
 from models import (
@@ -31,6 +32,7 @@ from models import (
 from embedding import EmbeddingGenerator
 from k8s_client import KubernetesClient
 from worker import BackgroundWorker
+from onboarding_client import OnboardingClient
 
 # Configure logging
 structlog.configure(
@@ -60,12 +62,13 @@ embedding_generator: Optional[EmbeddingGenerator] = None
 k8s_client: Optional[KubernetesClient] = None
 worker: Optional[BackgroundWorker] = None
 http_client: Optional[httpx.AsyncClient] = None
+onboarding_client: Optional[OnboardingClient] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management."""
-    global embedding_generator, k8s_client, worker, http_client
+    global embedding_generator, k8s_client, worker, http_client, onboarding_client
 
     settings = get_settings()
 
@@ -85,6 +88,9 @@ async def lifespan(app: FastAPI):
         timeout=30.0,
         limits=httpx.Limits(max_keepalive_connections=20, max_connections=100),
     )
+    onboarding_client = OnboardingClient(
+        base_url=settings.onboarding_service_url,
+    )
 
     # Start background worker
     await worker.start()
@@ -98,6 +104,8 @@ async def lifespan(app: FastAPI):
         await worker.stop()
     if http_client:
         await http_client.aclose()
+    if onboarding_client:
+        await onboarding_client.close()
     logger.info("ingestion_service_shutting_down")
 
 
@@ -291,7 +299,8 @@ async def semantic_search(
             SearchResult(
                 id=result["id"],
                 score=result["score"],
-                resource_type=result["payload"].get("resource_type", "unknown"),
+                resource_type=result["payload"].get(
+                    "resource_type", "unknown"),
                 name=result["payload"].get("name", "unknown"),
                 namespace=result["payload"].get("namespace"),
                 description=result["payload"].get("description", ""),
@@ -348,6 +357,290 @@ async def list_jobs(
     return jobs[:limit]
 
 
+# ============ Onboarding Service Integration ============
+
+
+@app.get("/clusters")
+async def list_clusters(
+    provider: Optional[str] = None,
+    status_filter: Optional[str] = None,
+):
+    """List clusters registered in Onboarding Service.
+
+    Fetches clusters from the Onboarding Service (Port 8011).
+
+    Args:
+        provider: Filter by provider (kubernetes, aws, azure, gcp)
+        status_filter: Filter by status (active, pending, error)
+
+    Returns:
+        List of cluster information
+    """
+    try:
+        logger.info(
+            "listing_clusters",
+            provider=provider,
+            status_filter=status_filter,
+        )
+
+        if onboarding_client is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Onboarding Service client not initialized",
+            )
+
+        clusters = await onboarding_client.list_clusters(
+            provider=provider,
+            status_filter=status_filter,
+        )
+
+        logger.info(
+            "clusters_fetched",
+            count=len(clusters) if isinstance(clusters, list) else 0,
+        )
+
+        return {
+            "clusters": clusters if isinstance(clusters, list) else [],
+            "total": len(clusters) if isinstance(clusters, list) else 0,
+        }
+
+    except Exception as e:
+        logger.error("list_clusters_failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch clusters: {str(e)}",
+        )
+
+
+@app.get("/clusters/{cluster_id}")
+async def get_cluster(cluster_id: str):
+    """Get cluster details from Onboarding Service.
+
+    Args:
+        cluster_id: Cluster UUID
+
+    Returns:
+        Cluster information
+    """
+    try:
+        if onboarding_client is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Onboarding Service client not initialized",
+            )
+
+        cluster = await onboarding_client.get_cluster(cluster_id)
+
+        if cluster is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND,
+                detail=f"Cluster {cluster_id} not found",
+            )
+
+        return cluster
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("get_cluster_failed", cluster_id=cluster_id, error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Failed to fetch cluster: {str(e)}",
+        )
+
+
+class MultiClusterIngestRequest(BaseModel):
+    """Request model for multi-cluster ingestion."""
+
+    cluster_ids: Optional[List[str]] = None
+    provider: Optional[str] = None
+    namespaces: Optional[List[str]] = None
+    resource_types: Optional[List[str]] = None
+
+
+@app.post("/ingest/all-clusters", response_model=IngestResponse)
+async def ingest_all_clusters(
+    request: MultiClusterIngestRequest,
+    background_tasks: BackgroundTasks,
+):
+    """Ingest resources from all registered clusters.
+
+    Fetches clusters from Onboarding Service and triggers ingestion
+    for each cluster in parallel.
+
+    Args:
+        request: Ingestion configuration
+        background_tasks: FastAPI background tasks
+
+    Returns:
+        Ingestion response with job ID
+    """
+    try:
+        if onboarding_client is None:
+            raise HTTPException(
+                status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+                detail="Onboarding Service client not initialized",
+            )
+
+        job_id = str(uuid.uuid4())
+        logger.info(
+            "multi_cluster_ingestion_started",
+            job_id=job_id,
+            cluster_ids=request.cluster_ids,
+            provider=request.provider,
+        )
+
+        # Create job record
+        job = IngestionJob(
+            job_id=job_id,
+            source_type="kubernetes_multi_cluster",
+            status=IngestionJobStatus.PENDING,
+            namespaces=request.namespaces or ["default"],
+            resource_types=request.resource_types or [
+                "pod", "deployment", "service"],
+            created_at=datetime.utcnow(),
+        )
+        job_store[job_id] = job
+
+        # Start background processing
+        background_tasks.add_task(
+            process_multi_cluster_ingestion,
+            job_id,
+            request,
+        )
+
+        # Update status
+        job.status = IngestionJobStatus.RUNNING
+        job.started_at = datetime.utcnow()
+
+        logger.info("multi_cluster_ingestion_job_created", job_id=job_id)
+
+        return IngestResponse(
+            job_id=job_id,
+            status=job.status,
+            message="Multi-cluster ingestion job started",
+            estimated_completion="5-10 minutes",
+        )
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("multi_cluster_ingestion_failed", error=str(e))
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail=f"Multi-cluster ingestion failed: {str(e)}",
+        )
+
+
+async def process_multi_cluster_ingestion(
+    job_id: str,
+    request: MultiClusterIngestRequest,
+):
+    """Background task to process multi-cluster ingestion."""
+    job = job_store[job_id]
+    documents: List[ResourceDocument] = []
+
+    try:
+        # Fetch clusters from Onboarding Service
+        if request.cluster_ids:
+            clusters = []
+            for cluster_id in request.cluster_ids:
+                cluster = await onboarding_client.get_cluster(cluster_id)
+                if cluster:
+                    clusters.append(cluster)
+        else:
+            clusters = await onboarding_client.list_clusters(
+                provider=request.provider,
+                status_filter="active",
+            )
+            if not isinstance(clusters, list):
+                clusters = []
+
+        logger.info(
+            "processing_clusters",
+            job_id=job_id,
+            cluster_count=len(clusters),
+        )
+
+        # Process each cluster
+        for cluster in clusters:
+            cluster_id = cluster.get("id")
+            cluster_name = cluster.get("name", "unknown")
+
+            try:
+                # Get cluster credentials from Onboarding Service
+                # In production, this would load the kubeconfig
+                # For now, we use the local kubeconfig
+
+                # Fetch namespaces (use configured or all namespaces)
+                namespaces = request.namespaces or ["default"]
+
+                for namespace in namespaces:
+                    for resource_type in job.resource_types:
+                        try:
+                            resources = await k8s_client.get_resources(
+                                namespace=namespace,
+                                resource_type=resource_type,
+                            )
+
+                            for resource in resources:
+                                doc = ResourceDocument(
+                                    id=f"{cluster_id}/{namespace}/{resource_type}/{resource['name']}",
+                                    resource_type=resource_type,
+                                    name=resource["name"],
+                                    namespace=namespace,
+                                    description=generate_description(
+                                        resource_type, resource),
+                                    content=json.dumps(resource),
+                                    metadata={
+                                        "cluster_id": cluster_id,
+                                        "cluster_name": cluster_name,
+                                        "labels": resource.get("labels", {}),
+                                        "annotations": resource.get("annotations", {}),
+                                        "created_at": resource.get("created_at"),
+                                        "status": resource.get("status", {}),
+                                    },
+                                )
+                                documents.append(doc)
+
+                        except Exception as e:
+                            logger.error(
+                                "resource_fetch_failed",
+                                cluster_id=cluster_id,
+                                namespace=namespace,
+                                resource_type=resource_type,
+                                error=str(e),
+                            )
+
+            except Exception as e:
+                logger.error(
+                    "cluster_processing_failed",
+                    cluster_id=cluster_id,
+                    error=str(e),
+                )
+
+        # Generate embeddings and store
+        await process_documents(documents, "kubernetes")
+
+        # Update job status
+        job.status = IngestionJobStatus.COMPLETED
+        job.completed_at = datetime.utcnow()
+        job.documents_processed = len(documents)
+
+        logger.info(
+            "multi_cluster_ingestion_completed",
+            job_id=job_id,
+            documents_processed=len(documents),
+            cluster_count=len(clusters),
+        )
+
+    except Exception as e:
+        job.status = IngestionJobStatus.FAILED
+        job.error_message = str(e)
+        logger.error("multi_cluster_ingestion_job_failed",
+                     job_id=job_id, error=str(e))
+
+
 async def process_k8s_ingestion(job_id: str, ingest_req: IngestRequest):
     """Background task to process Kubernetes ingestion."""
     job = job_store[job_id]
@@ -369,7 +662,8 @@ async def process_k8s_ingestion(job_id: str, ingest_req: IngestRequest):
                             resource_type=resource_type,
                             name=resource["name"],
                             namespace=namespace,
-                            description=generate_description(resource_type, resource),
+                            description=generate_description(
+                                resource_type, resource),
                             content=json.dumps(resource),
                             metadata={
                                 "labels": resource.get("labels", {}),

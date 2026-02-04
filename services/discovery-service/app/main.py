@@ -2,6 +2,7 @@
 Main FastAPI application for Discovery Service.
 """
 
+from app.api.v1 import scans, hosts, discovery, suggestions, discovered
 from contextlib import asynccontextmanager
 from datetime import datetime
 
@@ -23,6 +24,7 @@ from app.middleware import (
 from app.monitoring import metrics
 from app.services.host_manager import HostManager
 from app.services.job_manager import JobManager
+from app.services.discovered_manager import DiscoveredManager
 from app.scanners.factory import ScannerFactory
 from app.services.scan_orchestrator import ScanOrchestrator
 
@@ -39,17 +41,20 @@ async def lifespan(app: FastAPI):
     job_manager = JobManager()
     host_manager = HostManager()
     orchestrator = ScanOrchestrator(job_manager)
+    discovered_manager = DiscoveredManager()
 
     # Store in app state
     app.state.job_manager = job_manager
     app.state.host_manager = host_manager
     app.state.orchestrator = orchestrator
+    app.state.discovered_manager = discovered_manager
     app.state.startup_time = datetime.utcnow()
 
     # Initialize Redis client for rate limiting
     app.state.redis_client = get_redis_client()
     if app.state.redis_client:
-        logger.info("redis_connected", message="Rate limiting uses Redis backend")
+        logger.info("redis_connected",
+                    message="Rate limiting uses Redis backend")
     else:
         logger.warning(
             "redis_not_available", message="Rate limiting uses in-memory storage"
@@ -59,7 +64,8 @@ async def lifespan(app: FastAPI):
     for scanner_type in ["fast", "detailed", "python"]:
         try:
             scanner = ScannerFactory.create_scanner(scanner_type)
-            metrics.update_scanner_availability(scanner.name, scanner.available)
+            metrics.update_scanner_availability(
+                scanner.name, scanner.available)
         except Exception:
             metrics.update_scanner_availability(scanner_type, False)
 
@@ -197,8 +203,9 @@ def create_application() -> FastAPI:
 app = create_application()
 
 # Import and include routers
-from app.api.v1 import scans, hosts, discovery
 
 app.include_router(scans.router, prefix="/api/v1", tags=["scans"])
 app.include_router(hosts.router, prefix="/api/v1", tags=["hosts"])
 app.include_router(discovery.router, prefix="/api/v1", tags=["discovery"])
+app.include_router(suggestions.router, prefix="/api/v1", tags=["suggestions"])
+app.include_router(discovered.router, prefix="/api/v1", tags=["discovered"])

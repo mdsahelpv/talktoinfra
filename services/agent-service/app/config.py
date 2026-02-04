@@ -14,7 +14,8 @@ class Settings(BaseSettings):
 
     # Service
     service_port: int = Field(default=8006, description="Service port")
-    service_name: str = Field(default="agent-service", description="Service name")
+    service_name: str = Field(default="agent-service",
+                              description="Service name")
     environment: str = Field(default="development", description="Environment")
     log_level: str = Field(default="INFO", description="Logging level")
 
@@ -80,7 +81,8 @@ class Settings(BaseSettings):
     )
 
     # Agent Configuration
-    max_iterations: int = Field(default=10, description="Maximum agent iterations")
+    max_iterations: int = Field(
+        default=10, description="Maximum agent iterations")
     max_context_tokens: int = Field(
         default=8000, description="Maximum context tokens for LLM"
     )
@@ -102,6 +104,9 @@ class Settings(BaseSettings):
     )
     audit_service_url: str = Field(
         default="http://audit-service:8005", description="Audit Service URL"
+    )
+    onboarding_service_url: str = Field(
+        default="http://localhost:8011", description="Onboarding Service URL"
     )
 
     # Security

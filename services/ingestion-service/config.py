@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     embedding_model: str = "nomic-embed-text"
     embedding_dimensions: int = 768
 
+    # Onboarding Service URL
+    onboarding_service_url: str = "http://localhost:8011"
+
     # Ingestion Settings
     batch_size: int = 100
     max_workers: int = 4

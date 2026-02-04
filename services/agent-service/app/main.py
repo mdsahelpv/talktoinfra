@@ -29,6 +29,7 @@ from app.agents.action_agent import get_action_agent, ActionStatus
 
 # Import utilities
 from app.config import get_settings
+from app.onboarding_client import OnboardingClient
 
 # Configure logging
 structlog.configure(
@@ -56,6 +57,9 @@ _task_store: Dict[str, Dict[str, Any]] = {}
 _approval_store: Dict[str, Dict[str, Any]] = {}
 _active_connections: List[WebSocket] = []
 
+# Service components
+onboarding_client: Optional[OnboardingClient] = None
+
 
 # Pydantic Models for API
 
@@ -69,14 +73,19 @@ class ExecuteRequest(BaseModel):
     query: str = Field(
         ..., min_length=1, max_length=10000, description="User query or command"
     )
-    namespace: str = Field(default="default", description="Kubernetes namespace")
+    cluster_id: Optional[str] = Field(
+        default=None, description="Target cluster ID (from Onboarding Service)"
+    )
+    namespace: str = Field(
+        default="default", description="Kubernetes namespace")
     parameters: Dict[str, Any] = Field(
         default_factory=dict, description="Additional parameters"
     )
     context: Dict[str, Any] = Field(
         default_factory=dict, description="Additional context"
     )
-    dry_run: bool = Field(default=True, description="Perform dry-run for action agents")
+    dry_run: bool = Field(
+        default=True, description="Perform dry-run for action agents")
     auto_execute: bool = Field(
         default=False, description="Auto-execute if safe (read-only only)"
     )
@@ -86,6 +95,7 @@ class ExecuteRequest(BaseModel):
             "example": {
                 "agent_type": "query",
                 "query": "Show me pods in default namespace",
+                "cluster_id": "550e8400-e29b-41d4-a716-446655440000",
                 "namespace": "default",
                 "auto_execute": True,
             }
@@ -161,15 +171,28 @@ class HealthResponse(BaseModel):
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
+    global onboarding_client
+
     logger.info("agent_service_starting")
+
+    # Initialize settings
+    settings = get_settings()
+
+    # Initialize Onboarding Service client
+    onboarding_client = OnboardingClient(
+        base_url=settings.onboarding_service_url,
+    )
 
     # Initialize agent registry
     registry = get_agent_registry()
-    logger.info("agent_registry_initialized", agents=len(registry.list_agents()))
+    logger.info("agent_registry_initialized",
+                agents=len(registry.list_agents()))
 
     yield
 
     # Cleanup
+    if onboarding_client:
+        await onboarding_client.close()
     logger.info("agent_service_shutting_down")
 
 
@@ -274,7 +297,134 @@ async def list_agents():
         )
     except Exception as e:
         logger.error("list_agents_failed", error=str(e))
-        raise HTTPException(status_code=500, detail=f"Failed to list agents: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Failed to list agents: {str(e)}")
+
+
+# ============ Onboarding Service Integration ============
+
+
+@app.get("/api/v1/clusters")
+async def list_clusters(
+    status_filter: Optional[str] = None,
+    provider: Optional[str] = None,
+):
+    """List clusters registered in Onboarding Service.
+
+    Fetches clusters from the Onboarding Service (Port 8011).
+
+    Args:
+        status_filter: Filter by status (active, pending, error)
+        provider: Filter by provider (kubernetes, aws, azure, gcp)
+
+    Returns:
+        List of cluster information
+    """
+    try:
+        logger.info(
+            "listing_clusters",
+            provider=provider,
+            status_filter=status_filter,
+        )
+
+        if onboarding_client is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Onboarding Service client not initialized",
+            )
+
+        clusters = await onboarding_client.list_clusters(
+            provider=provider,
+            status_filter=status_filter,
+        )
+
+        logger.info(
+            "clusters_fetched",
+            count=len(clusters) if isinstance(clusters, list) else 0,
+        )
+
+        return {
+            "clusters": clusters if isinstance(clusters, list) else [],
+            "total": len(clusters) if isinstance(clusters, list) else 0,
+        }
+
+    except Exception as e:
+        logger.error("list_clusters_failed", error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch clusters: {str(e)}",
+        )
+
+
+@app.get("/api/v1/clusters/{cluster_id}")
+async def get_cluster(cluster_id: str):
+    """Get cluster details from Onboarding Service.
+
+    Args:
+        cluster_id: Cluster UUID
+
+    Returns:
+        Cluster information
+    """
+    try:
+        if onboarding_client is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Onboarding Service client not initialized",
+            )
+
+        cluster = await onboarding_client.get_cluster(cluster_id)
+
+        if cluster is None:
+            raise HTTPException(
+                status_code=404,
+                detail=f"Cluster {cluster_id} not found",
+            )
+
+        return cluster
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("get_cluster_failed", cluster_id=cluster_id, error=str(e))
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to fetch cluster: {str(e)}",
+        )
+
+
+@app.post("/api/v1/clusters/{cluster_id}/test-connection")
+async def test_cluster_connection(cluster_id: str):
+    """Test cluster connection.
+
+    Args:
+        cluster_id: Cluster UUID
+
+    Returns:
+        Connection test result
+    """
+    try:
+        if onboarding_client is None:
+            raise HTTPException(
+                status_code=503,
+                detail="Onboarding Service client not initialized",
+            )
+
+        result = await onboarding_client.test_cluster_connection(cluster_id)
+        return result
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(
+            "test_connection_failed",
+            cluster_id=cluster_id,
+            error=str(e),
+        )
+        raise HTTPException(
+            status_code=500,
+            detail=f"Failed to test connection: {str(e)}",
+        )
 
 
 @app.post("/api/v1/agents/execute", response_model=ExecuteResponse)
@@ -345,7 +495,8 @@ async def execute_agent(
             )
 
         # Calculate execution time
-        execution_time = int((datetime.utcnow() - start_time).total_seconds() * 1000)
+        execution_time = int(
+            (datetime.utcnow() - start_time).total_seconds() * 1000)
 
         # Update task store
         _task_store[task_id].update(
@@ -393,7 +544,8 @@ async def execute_agent(
             }
         )
 
-        raise HTTPException(status_code=500, detail=f"Execution failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Execution failed: {str(e)}")
 
 
 async def _execute_query_agent(request: ExecuteRequest, task_id: str) -> Dict[str, Any]:
@@ -561,7 +713,8 @@ async def get_task_status(task_id: str):
     Returns current status and results for a previously submitted task.
     """
     if task_id not in _task_store:
-        raise HTTPException(status_code=404, detail=f"Task {task_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Task {task_id} not found")
 
     task = _task_store[task_id]
 
@@ -594,7 +747,8 @@ async def approve_action(
     **IMPORTANT:** Only approvers with proper authorization can approve actions.
     """
     if approval_id not in _approval_store:
-        raise HTTPException(status_code=404, detail=f"Approval {approval_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Approval {approval_id} not found")
 
     approval = _approval_store[approval_id]
 
@@ -672,7 +826,8 @@ async def approve_action(
 
     except Exception as e:
         logger.error("approval_failed", approval_id=approval_id, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Approval failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Approval failed: {str(e)}")
 
 
 @app.post("/api/v1/agents/approvals/{approval_id}/reject")
@@ -689,7 +844,8 @@ async def reject_action(
     Once rejected, the action will not be executed.
     """
     if approval_id not in _approval_store:
-        raise HTTPException(status_code=404, detail=f"Approval {approval_id} not found")
+        raise HTTPException(
+            status_code=404, detail=f"Approval {approval_id} not found")
 
     approval = _approval_store[approval_id]
 
@@ -757,7 +913,8 @@ async def reject_action(
 
     except Exception as e:
         logger.error("rejection_failed", approval_id=approval_id, error=str(e))
-        raise HTTPException(status_code=500, detail=f"Rejection failed: {str(e)}")
+        raise HTTPException(
+            status_code=500, detail=f"Rejection failed: {str(e)}")
 
 
 @app.get("/api/v1/agents/approvals/pending")

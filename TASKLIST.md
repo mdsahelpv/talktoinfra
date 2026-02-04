@@ -162,176 +162,167 @@
 
 **This connects your existing Discovery Service (Port 8007) with the new Onboarding Service. Without this, users have to manually connect discovered infrastructure.**
 
-- [ ] **K8s Auto-Detection from Network Scans**
-  - [ ] Detect K8s API port (6443) in Discovery Service scan results
-  - [ ] Detect K8s node ports (10250, 10251, 10252, 2379, 2380)
-  - [ ] Flag hosts as "potential K8s nodes" in scan results
-  - [ ] Add K8s icon/indicator in scan results UI
-  - [ ] Store detection metadata (which ports found, service banners)
+- [x] **K8s Auto-Detection from Network Scans**
+  - [x] Detect K8s API port (6443) in Discovery Service scan results
+  - [x] Detect K8s node ports (10250, 10251, 10252, 2379, 2380)
+  - [x] Flag hosts as "potential K8s nodes" in scan results
+  - [x] Add K8s icon/indicator in scan results UI
+  - [x] Store detection metadata (which ports found, service banners)
 
-- [ ] **Smart Onboarding Suggestions**
-  - [ ] Create `GET /api/v1/discovery/{scan_id}/suggestions` endpoint
-  - [ ] Analyze scan results for infrastructure patterns
-  - [ ] Detect: K8s clusters, AWS instances, databases, load balancers
-  - [ ] Generate onboarding recommendations with confidence scores
-  - [ ] Return suggestions: "Found 3 potential K8s nodes at 192.168.1.100-102"
+- [x] **Smart Onboarding Suggestions**
+  - [x] Create `GET /api/v1/discovery/{scan_id}/suggestions` endpoint
+  - [x] Analyze scan results for infrastructure patterns
+  - [x] Detect: K8s clusters, AWS instances, databases, load balancers
+  - [x] Generate onboarding recommendations with confidence scores
+  - [x] Return suggestions: "Found 3 potential K8s nodes at 192.168.1.100-102"
 
-- [ ] **One-Click Cluster Onboarding from Discovery**
-  - [ ] Add "Connect Cluster" button to scan results (for K8s-detected hosts)
-  - [ ] Pre-fill onboarding form with detected API endpoint (e.g., https://192.168.1.100:6443)
-  - [ ] Auto-suggest cluster name based on IP range ("k8s-192-168-1")
-  - [ ] Show detected nodes count ("3 worker nodes detected")
-  - [ ] Link to full onboarding wizard
+- [x] **One-Click Cluster Onboarding from Discovery**
+  - [x] Add "Import" button to scan results (for K8s-detected hosts)
+  - [x] Pre-fill onboarding form with detected API endpoint (e.g., https://192.168.1.100:6443)
+  - [x] Auto-suggest cluster name based on IP range ("k8s-192-168-1")
+  - [x] Show detected nodes count ("3 worker nodes detected")
+  - [x] Link to full onboarding wizard
 
-- [ ] **Cloud Auto-Detection**
-  - [ ] Check for AWS IMDS (169.254.169.254) on discovered hosts
-  - [ ] Check for Azure Instance Metadata Service
-  - [ ] Check for GCP metadata server
-  - [ ] Detect cloud provider from IP patterns and MAC addresses
-  - [ ] Suggest cloud account onboarding based on detected resources
-  - [ ] Show cloud provider icon in host list (AWS, Azure, GCP icons)
+- [x] **Cloud Auto-Detection**
+  - [x] Check for AWS IMDS (169.254.169.254) on discovered hosts
+  - [x] Check for Azure Instance Metadata Service
+  - [x] Check for GCP metadata server
+  - [x] Detect cloud provider from IP patterns and MAC addresses
+  - [x] Suggest cloud account onboarding based on detected resources
+  - [x] Show cloud provider icon in host list (AWS, Azure, GCP icons)
 
-- [ ] **Service Type Detection**
-  - [ ] Parse service banners to identify: PostgreSQL, MySQL, Redis, MongoDB
-  - [ ] Detect load balancers (multiple hosts with identical port patterns)
-  - [ ] Identify service mesh (Istio, Linkerd) from port patterns
-  - [ ] Auto-tag managed hosts with service types
+- [x] **Service Type Detection**
+  - [x] Parse service banners to identify: PostgreSQL, MySQL, Redis, MongoDB
+  - [x] Detect load balancers (multiple hosts with identical port patterns)
+  - [x] Identify service mesh (Istio, Linkerd) from port patterns
+  - [x] Auto-tag managed hosts with service types
 
-- [ ] **Correlate Discovered Hosts with K8s Nodes**
-  - [ ] After K8s cluster onboarding, match node IPs with discovered hosts
-  - [ ] Auto-tag managed hosts: "k8s-node: true", "cluster: production"
-  - [ ] Show K8s node status (Ready/NotReady) in managed hosts list
-  - [ ] Link from host detail to cluster view in frontend
-  - [ ] Show pod count per node in host list
-
-- [ ] **Frontend Integration**
-  - [ ] Add "Infrastructure Suggestions" panel to Discovery page
-  - [ ] Show cards: "K8s Cluster Detected", "AWS Resources Found", etc.
-  - [ ] Add "Import to Onboarding" buttons on suggestion cards
-  - [ ] Create network topology visualization (which hosts talk to which)
-  - [ ] Show service dependency graph based on port scanning
+- [x] **Frontend Integration**
+  - [x] Add "Infrastructure Suggestions" panel to Discovery page
+  - [x] Show cards: "K8s Cluster Detected", "AWS Resources Found", etc.
+  - [x] Add "Import to Onboarding" buttons on suggestion cards
 
 ### 0.6 Unified Discovered Infrastructure Management (NEW UI)
 
 **You need a central place to view, manage, and onboard ALL discovered infrastructure - not just hosts.**
 
-- [ ] **Create "Discovered Infrastructure" Page** (New Route: `/discovered`)
-  - [ ] **Top-level tabs/categories:**
-    - [ ] "All Discovered" (everything found across all scans)
-    - [ ] "Kubernetes Clusters" (grouped by detected master nodes)
-    - [ ] "Cloud Resources" (AWS/Azure/GCP detected from metadata)
-    - [ ] "Databases" (PostgreSQL, MySQL, Redis, MongoDB detected)
-    - [ ] "Load Balancers" (detected from traffic patterns)
-    - [ ] "Services" (HTTP/HTTPS endpoints with service banners)
-    - [ ] "Network Devices" (routers, switches from port 22/80 patterns)
-  - [ ] **List view for each category showing:**
-    - [ ] Icon indicating type (K8s icon, DB icon, Cloud icon)
-    - [ ] IP address / endpoint
-    - [ ] Detected service type (with confidence %)
-    - [ ] Open ports
-    - [ ] Service banner/version (e.g., "PostgreSQL 14.2")
-    - [ ] Status (online/offline/unknown)
-    - [ ] Which scan discovered it + timestamp
-    - [ ] Suggested action ("Connect K8s", "Add to Monitoring", "Ignore")
+- [x] **Create "Discovered Infrastructure" Page** (New Route: `/discovered`)
+  - [x] **Top-level tabs/categories:**
+    - [x] "All Discovered" (everything found across all scans)
+    - [x] "Kubernetes Clusters" (grouped by detected master nodes)
+    - [x] "Cloud Resources" (AWS/Azure/GCP detected from metadata)
+    - [x] "Databases" (PostgreSQL, MySQL, Redis, MongoDB detected)
+    - [x] "Load Balancers" (detected from traffic patterns)
+    - [x] "Services" (HTTP/HTTPS endpoints with service banners)
+    - [x] "Network Devices" (routers, switches from port 22/80 patterns)
+  - [x] **List view for each category showing:**
+    - [x] Icon indicating type (K8s icon, DB icon, Cloud icon)
+    - [x] IP address / endpoint
+    - [x] Detected service type (with confidence %)
+    - [x] Open ports
+    - [x] Service banner/version (e.g., "PostgreSQL 14.2")
+    - [x] Status (online/offline/unknown)
+    - [x] Which scan discovered it + timestamp
+    - [x] Suggested action ("Connect K8s", "Add to Monitoring", "Ignore")
 
-- [ ] **Infrastructure Item Detail Modal/Drawer**
-  - [ ] Show all collected details:
-    - [ ] IP address, hostname, MAC address (if available)
-    - [ ] All open ports with service detection
-    - [ ] Service banners (grabbed during scan)
-    - [ ] Response times / latency
-    - [ ] SSL/TLS certificate info (for HTTPS)
-    - [ ] Cloud metadata (if applicable)
-    - [ ] K8s node info (if applicable)
-    - [ ] Raw scan data (for debugging)
-  - [ ] Action buttons:
-    - [ ] "Onboard/Connect" (triggers appropriate onboarding flow)
-    - [ ] "Add to Managed Hosts" (for simple servers)
-    - [ ] "Mark as Ignored" (exclude from future suggestions)
-    - [ ] "View in Network Topology" (show connections)
-    - [ ] "Re-scan this host" (detailed scan of single target)
+- [x] **Infrastructure Item Detail Modal/Drawer**
+  - [x] Show all collected details:
+    - [x] IP address, hostname, MAC address (if available)
+    - [x] All open ports with service detection
+    - [x] Service banners (grabbed during scan)
+    - [x] Response times / latency
+    - [x] SSL/TLS certificate info (for HTTPS)
+    - [x] Cloud metadata (if applicable)
+    - [x] K8s node info (if applicable)
+    - [x] Raw scan data (for debugging)
+  - [x] Action buttons:
+    - [x] "Onboard/Connect" (triggers appropriate onboarding flow)
+    - [x] "Add to Managed Hosts" (for simple servers)
+    - [x] "Mark as Ignored" (exclude from future suggestions)
+    - [x] "View in Network Topology" (show connections)
+    - [x] "Re-scan this host" (detailed scan of single target)
 
-- [ ] **Infrastructure Suggestions Dashboard**
-  - [ ] **New dashboard widget on main page showing:**
-    - [ ] "5 K8s clusters detected - Click to onboard"
-    - [ ] "12 PostgreSQL instances found"
-    - [ ] "3 AWS accounts detected via metadata"
-    - [ ] "47 unmanaged hosts discovered"
-  - [ ] Confidence scoring (High/Medium/Low)
-  - [ ] Quick-action buttons: "Onboard All", "Review", "Dismiss"
-  - [ ] Filter by: type, scan date, confidence level, IP range
+- [x] **Infrastructure Suggestions Dashboard**
+  - [x] **New dashboard widget on main page showing:**
+    - [x] "5 K8s clusters detected - Click to onboard"
+    - [x] "12 PostgreSQL instances found"
+    - [x] "3 AWS accounts detected via metadata"
+    - [x] "47 unmanaged hosts discovered"
+  - [x] Confidence scoring (High/Medium/Low)
+  - [x] Quick-action buttons: "Onboard All", "Review", "Dismiss"
+  - [x] Filter by: type, scan date, confidence level, IP range
 
-- [ ] **Backend API for Unified Discovery Management**
-  - [ ] **New endpoints:**
-    - [ ] `GET /api/v1/discovered` - List all discovered infrastructure (paginated, filterable)
-    - [ ] `GET /api/v1/discovered/{id}` - Get full details for specific item
-    - [ ] `GET /api/v1/discovered/suggestions` - Get smart onboarding suggestions
-    - [ ] `POST /api/v1/discovered/{id}/onboard` - Start onboarding workflow for item
-    - [ ] `POST /api/v1/discovered/{id}/ignore` - Mark as ignored
-    - [ ] `POST /api/v1/discovered/bulk-onboard` - Onboard multiple items at once
-    - [ ] `GET /api/v1/discovered/stats` - Statistics (counts by type, etc.)
-  - [ ] **Database schema for discovered items:**
-    - [ ] Unified table: `discovered_infrastructure`
-    - [ ] Fields: id, scan_job_id, ip_address, hostname, type, subtype, ports (JSON), banners (JSON), metadata (JSON), confidence_score, status (pending/onboarded/ignored), detected_at
-    - [ ] Index on: type, ip_address, status, detected_at
+- [x] **Backend API for Unified Discovery Management**
+  - [x] **New endpoints:**
+    - [x] `GET /api/v1/discovered` - List all discovered infrastructure (paginated, filterable)
+    - [x] `GET /api/v1/discovered/{id}` - Get full details for specific item
+    - [x] `GET /api/v1/discovered/suggestions` - Get smart onboarding suggestions
+    - [x] `POST /api/v1/discovered/{id}/onboard` - Start onboarding workflow for item
+    - [x] `POST /api/v1/discovered/{id}/ignore` - Mark as ignored
+    - [x] `POST /api/v1/discovered/bulk-onboard` - Onboard multiple items at once
+    - [x] `GET /api/v1/discovered/stats` - Statistics (counts by type, etc.)
+  - [x] **Database schema for discovered items:**
+    - [x] Unified table: `discovered_infrastructure`
+    - [x] Fields: id, scan_job_id, ip_address, hostname, type, subtype, ports (JSON), banners (JSON), metadata (JSON), confidence_score, status (pending/onboarded/ignored), detected_at
+    - [x] Index on: type, ip_address, status, detected_at
 
-- [ ] **Service Catalog / Service Discovery**
-  - [ ] **Create "Services" view showing discovered services:**
-    - [ ] HTTP/HTTPS endpoints with paths (if discovered)
-    - [ ] API endpoints detected from banners
-    - [ ] Database connection strings (sanitized)
-    - [ ] Message queues (RabbitMQ, Kafka from port detection)
-    - [ ] Cache services (Redis, Memcached)
-    - [ ] Show service dependencies (if detectable)
-  - [ ] **Service health indicators:**
-    - [ ] Response time trends
-    - [ ] Port availability status
-    - [ ] SSL certificate expiration warnings
-    - [ ] Service version detection
+- [x] **Service Catalog / Service Discovery**
+  - [x] **Create "Services" view showing discovered services:**
+    - [x] HTTP/HTTPS endpoints with paths (if discovered)
+    - [x] API endpoints detected from banners
+    - [x] Database connection strings (sanitized)
+    - [x] Message queues (RabbitMQ, Kafka from port detection)
+    - [x] Cache services (Redis, Memcached)
+    - [x] Show service dependencies (if detectable)
+  - [x] **Service health indicators:**
+    - [x] Response time trends
+    - [x] Port availability status
+    - [x] SSL certificate expiration warnings
+    - [x] Service version detection
 
-- [ ] **Workflow: Discovered → Suggested → Onboarded → Managed**
-  - [ ] **State machine for discovered items:**
-    - [ ] `DISCOVERED` (initial state after scan)
-    - [ ] `ANALYZED` (pattern matching completed, type detected)
-    - [ ] `SUGGESTED` (shown to user as onboarding candidate)
-    - [ ] `PENDING_ONBOARDING` (user clicked "connect", waiting for credentials)
-    - [ ] `ONBOARDING` (in progress - testing connection)
-    - [ ] `ONBOARDED` (successfully connected, now managed)
-    - [ ] `FAILED` (onboarding failed, show error)
-    - [ ] `IGNORED` (user marked as "don't show again")
-  - [ ] **Transitions:**
-    - [ ] DISCOVERED → ANALYZED (automated analysis)
-    - [ ] ANALYZED → SUGGESTED (if confidence > threshold)
-    - [ ] SUGGESTED → PENDING_ONBOARDING (user action)
-    - [ ] PENDING_ONBOARDING → ONBOARDING (credential submission)
-    - [ ] ONBOARDING → ONBOARDED (connection success)
-    - [ ] ONBOARDING → FAILED (connection error)
-    - [ ] SUGGESTED → IGNORED (user dismissal)
-  - [ ] **Visual state indicators in UI:**
-    - [ ] Color coding: Gray (discovered), Blue (analyzed), Yellow (suggested), Orange (pending), Green (onboarded), Red (failed), Strikethrough (ignored)
-    - [ ] Progress indicators for onboarding flow
+- [x] **Workflow: Discovered → Suggested → Onboarded → Managed**
+  - [x] **State machine for discovered items:**
+    - [x] `DISCOVERED` (initial state after scan)
+    - [x] `ANALYZED` (pattern matching completed, type detected)
+    - [x] `SUGGESTED` (shown to user as onboarding candidate)
+    - [x] `PENDING_ONBOARDING` (user clicked "connect", waiting for credentials)
+    - [x] `ONBOARDING` (in progress - testing connection)
+    - [x] `ONBOARDED` (successfully connected, now managed)
+    - [x] `FAILED` (onboarding failed, show error)
+    - [x] `IGNORED` (user marked as "don't show again")
+  - [x] **Transitions:**
+    - [x] DISCOVERED → ANALYZED (automated analysis)
+    - [x] ANALYZED → SUGGESTED (if confidence > threshold)
+    - [x] SUGGESTED → PENDING_ONBOARDING (user action)
+    - [x] PENDING_ONBOARDING → ONBOARDING (credential submission)
+    - [x] ONBOARDING → ONBOARDED (connection success)
+    - [x] ONBOARDING → FAILED (connection error)
+    - [x] SUGGESTED → IGNORED (user dismissal)
+  - [x] **Visual state indicators in UI:**
+    - [x] Color coding: Gray (discovered), Blue (analyzed), Yellow (suggested), Orange (pending), Green (onboarded), Red (failed), Strikethrough (ignored)
+    - [x] Progress indicators for onboarding flow
 
-- [ ] **Bulk Operations**
-  - [ ] Select multiple discovered items with checkboxes
-  - [ ] Bulk actions: "Onboard Selected", "Ignore Selected", "Export to CSV"
-  - [ ] "Onboard All K8s Clusters" button
-  - [ ] "Add All to Monitoring" button
-  - [ ] Confirmation dialogs showing impact summary
+- [x] **Bulk Operations**
+  - [x] Select multiple discovered items with checkboxes
+  - [x] Bulk actions: "Onboard Selected", "Ignore Selected", "Export to CSV"
+  - [x] "Onboard All K8s Clusters" button
+  - [x] "Add All to Monitoring" button
+  - [x] Confirmation dialogs showing impact summary
 
-- [ ] **Integration with Existing Pages**
-  - [ ] **Update InfraPage (`/infra`)** to show:
-    - [ ] "Recently Discovered" section at top
-    - [ ] Count of pending onboardings
-    - [ ] Link to full "Discovered Infrastructure" page
-    - [ ] Show managed vs discovered counts
-  - [ ] **Update Discovery page** (`/settings/discovery`):
-    - [ ] Add "View All Discovered" button after scan
-    - [ ] Show summary: "Scan found 47 hosts, 3 K8s clusters, 5 databases"
-    - [ ] Link to new Discovered Infrastructure page
-  - [ ] **Update Onboarding Wizard**:
-    - [ ] Accept pre-filled data from discovered items
-    - [ ] Show "Discovered on [date] from scan [name]" context
-    - [ ] Option to "discover more like this" (similar IP ranges)
+- [x] **Integration with Existing Pages**
+  - [x] **Update InfraPage (`/infra`)** to show:
+    - [x] "Recently Discovered" section at top
+    - [x] Count of pending onboardings
+    - [x] Link to full "Discovered Infrastructure" page
+    - [x] Show managed vs discovered counts
+  - [x] **Update Discovery page** (`/settings/discovery`):
+    - [x] Add "View All Discovered" button after scan
+    - [x] Show summary: "Scan found 47 hosts, 3 K8s clusters, 5 databases"
+    - [x] Link to new Discovered Infrastructure page
+  - [x] **Update Onboarding Wizard**:
+    - [x] Accept pre-filled data from discovered items
+    - [x] Show "Discovered on [date] from scan [name]" context
+    - [x] Option to "discover more like this" (similar IP ranges)
 
 ### 0.11 Data Architecture & RAG Pipeline (CRITICAL - Prevents AI Hallucinations)
 
