@@ -24,10 +24,14 @@ from intent_classifier import IntentClassifier
 from conversation_manager import ConversationManager
 from rag_engine import RAGEngine
 from llm_client import OllamaClient
+from query_pipeline import QueryPipeline
+from approval_workflow import ApprovalWorkflow, RiskAssessor
 from models import (
     QueryRequest,
     QueryResponse,
     IntentClassification,
+    ConversationCreateRequest,
+    ApprovalActionRequest,
 )
 
 # Configure logging
@@ -457,6 +461,229 @@ Intent: {intent.intent}
 Context: {format_rag_context(context)}
 
 Response:"""
+
+
+# Conversation endpoints
+@app.post("/conversations")
+async def create_conversation(request: ConversationCreateRequest):
+    """Create a new conversation."""
+    try:
+        conversation = await conversation_manager.create_conversation(
+            user_id=request.user_id,
+            title=request.title,
+            metadata=request.metadata,
+        )
+        return conversation
+    except Exception as e:
+        logger.error("create_conversation_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/conversations/{conversation_id}")
+async def get_conversation(conversation_id: str):
+    """Get a conversation by ID."""
+    conversation = await conversation_manager.get_conversation(conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return conversation
+
+
+@app.get("/conversations")
+async def list_conversations(user_id: str, limit: int = 20, offset: int = 0):
+    """List conversations for a user."""
+    conversations = await conversation_manager.list_conversations(
+        user_id=user_id, limit=limit, offset=offset
+    )
+    return {"items": conversations, "total": len(conversations)}
+
+
+@app.delete("/conversations/{conversation_id}")
+async def delete_conversation(conversation_id: str):
+    """Delete a conversation."""
+    success = await conversation_manager.delete_conversation(conversation_id)
+    if not success:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return {"message": "Conversation deleted"}
+
+
+@app.get("/conversations/{conversation_id}/messages")
+async def get_messages(conversation_id: str):
+    """Get messages for a conversation."""
+    conversation = await conversation_manager.get_conversation(conversation_id)
+    if not conversation:
+        raise HTTPException(status_code=404, detail="Conversation not found")
+    return conversation.get("messages", [])
+
+
+# Approval endpoints
+@app.post("/approvals")
+async def create_approval(
+    request: Request,
+    data: dict,
+):
+    """Create an approval request for an action."""
+    try:
+        from conversation_models import RiskLevel, ActionApproval
+        from approval_workflow import ApprovalWorkflow
+
+        settings = get_settings()
+        approval_workflow = ApprovalWorkflow(
+            redis_url=settings.redis_url,
+            postgres_url=settings.postgres_url,
+        )
+
+        approval = await approval_workflow.create_approval(
+            conversation_id=data["conversation_id"],
+            user_id=data["user_id"],
+            action_type=data["action_type"],
+            target_resources=data.get("target_resources", []),
+            description=data["description"],
+            risk_level=RiskLevel(data["risk_level"]),
+            impact_summary=data["impact_summary"],
+            rollback_plan=data.get("rollback_plan"),
+            metadata=data.get("metadata"),
+        )
+
+        logger.info(
+            "approval_created",
+            approval_id=approval.id,
+            conversation_id=approval.conversation_id,
+        )
+
+        return approval
+    except Exception as e:
+        logger.error("create_approval_failed", error=str(e))
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/approvals/{approval_id}")
+async def get_approval(approval_id: str):
+    """Get an approval request by ID."""
+    from approval_workflow import ApprovalWorkflow
+    from config import get_settings
+
+    settings = get_settings()
+    approval_workflow = ApprovalWorkflow(
+        redis_url=settings.redis_url,
+        postgres_url=settings.postgres_url,
+    )
+
+    approval = await approval_workflow.get_approval(approval_id)
+    if not approval:
+        raise HTTPException(status_code=404, detail="Approval not found")
+    return approval
+
+
+@app.post("/approvals/{approval_id}/approve")
+async def approve_action(approval_id: str, request: ApprovalActionRequest):
+    """Approve an action."""
+    from approval_workflow import ApprovalWorkflow
+    from config import get_settings
+
+    settings = get_settings()
+    approval_workflow = ApprovalWorkflow(
+        redis_url=settings.redis_url,
+        postgres_url=settings.postgres_url,
+    )
+
+    approval = await approval_workflow.approve(
+        approval_id=approval_id,
+        approver_id=request.action,
+        reason=request.reason,
+    )
+
+    if not approval:
+        raise HTTPException(status_code=404, detail="Approval not found")
+
+    logger.info(
+        "action_approved",
+        approval_id=approval_id,
+        approver_id=request.action,
+    )
+
+    return approval
+
+
+@app.post("/approvals/{approval_id}/reject")
+async def reject_action(approval_id: str, request: ApprovalActionRequest):
+    """Reject an action."""
+    from approval_workflow import ApprovalWorkflow
+    from config import get_settings
+
+    settings = get_settings()
+    approval_workflow = ApprovalWorkflow(
+        redis_url=settings.redis_url,
+        postgres_url=settings.postgres_url,
+    )
+
+    if not request.reason:
+        raise HTTPException(
+            status_code=400, detail="Rejection reason is required")
+
+    approval = await approval_workflow.reject(
+        approval_id=approval_id,
+        approver_id=request.action,
+        reason=request.reason,
+    )
+
+    if not approval:
+        raise HTTPException(status_code=404, detail="Approval not found")
+
+    logger.info(
+        "action_rejected",
+        approval_id=approval_id,
+        reason=request.reason,
+    )
+
+    return approval
+
+
+@app.get("/approvals/pending")
+async def list_pending_approvals(limit: int = 50):
+    """List all pending approvals."""
+    from approval_workflow import ApprovalWorkflow
+    from config import get_settings
+
+    settings = get_settings()
+    approval_workflow = ApprovalWorkflow(
+        redis_url=settings.redis_url,
+        postgres_url=settings.postgres_url,
+    )
+
+    approvals = await approval_workflow.list_pending(limit=limit)
+    return approvals
+
+
+@app.get("/conversations/{conversation_id}/approvals")
+async def get_conversation_approvals(conversation_id: str):
+    """Get all approvals for a conversation."""
+    from approval_workflow import ApprovalWorkflow
+    from config import get_settings
+
+    settings = get_settings()
+    approval_workflow = ApprovalWorkflow(
+        redis_url=settings.redis_url,
+        postgres_url=settings.postgres_url,
+    )
+
+    approvals = await approval_workflow.get_conversation_approvals(conversation_id)
+    return approvals
+
+
+# Intent classification endpoint
+@app.post("/classify")
+async def classify_intent(request: Request, data: dict):
+    """Classify the intent of a query."""
+    intent = intent_classifier.classify(data["query"])
+    return {
+        "intent": intent.intent,
+        "confidence": intent.confidence,
+        "entities": intent.entities,
+        "action_type": intent.action_type,
+        "target_resource": intent.target_resource,
+        "requires_approval": intent.requires_approval,
+        "risk_level": intent.risk_level,
+    }
 
 
 if __name__ == "__main__":

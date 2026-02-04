@@ -324,6 +324,58 @@
     - [x] Show "Discovered on [date] from scan [name]" context
     - [x] Option to "discover more like this" (similar IP ranges)
 
+### 0.7 User Interaction & Query Workflows (Chat Interface Core)
+
+**This implements the chat interface core - intent classification, chat workflow, and approval UI for infrastructure queries and actions.**
+
+- [x] **Intent Classification System** (services/ai-router/)
+  - [x] Enhanced intent classifier to categorize user messages:
+    - [x] QUERY (read-only questions about infrastructure)
+    - [x] ACTION (modification requests like "restart pod X")
+    - [x] DISCOVERY (network scans, exploration requests)
+    - [x] ONBOARDING (add new infrastructure)
+    - [x] MANAGEMENT (settings, users, etc.)
+  - [x] Confidence scoring for intent detection
+  - [x] Fallback handling for ambiguous requests
+  - [x] Context-aware classification (follow-up questions)
+
+- [x] **Chat Workflow Engine** (services/ai-router/)
+  - [x] Conversation state machine:
+    - [x] NEW → ACKNOWLEDGED → PROCESSING → PENDING_APPROVAL → EXECUTING → COMPLETED/FAILED
+  - [x] Multi-turn conversation support
+  - [x] Context preservation across messages
+  - [x] Conversation history storage (PostgreSQL)
+  - [x] Human-in-the-loop checkpoints for dangerous actions
+
+- [x] **Query Pipeline** (services/ai-router/)
+  - [x] RAG integration for infrastructure queries
+  - [x] Query intent routing:
+    - [x] If QUERY → Use RAG to find relevant infrastructure data
+    - [x] If ACTION → Route to Action Engine
+    - [x] If DISCOVERY → Trigger Discovery Service scan
+    - [x] If ONBOARDING → Trigger Onboarding flow
+  - [x] Source citations for AI responses
+  - [x] Confidence thresholds for answering
+
+- [x] **Approval UI Workflow** (services/frontend/)
+  - [x] Action approval modal/drawer showing:
+    - [x] What action will be performed
+    - [x] Target resources (pods, deployments, etc.)
+    - [x] Risk level (LOW, MEDIUM, HIGH, CRITICAL)
+    - [x] Estimated impact
+    - [x] Rollback plan if available
+  - [x] Approve/Reject buttons with audit logging
+  - [x] "Dry run" option to preview changes
+  - [x] Approval chain for critical actions (manager notification)
+
+- [x] **Response Formatting**
+  - [x] Structured response components:
+    - [x] Text explanations
+    - [x] Tables for resource listings
+    - [x] Code blocks for configs/logs
+    - [x] Links to detailed views
+    - [x] Source citations with timestamps
+
 ### 0.11 Data Architecture & RAG Pipeline (CRITICAL - Prevents AI Hallucinations)
 
 **DISCOVERY SCAN DATA → STRUCTURED STORAGE → VECTOR EMBEDDINGS → RAG → AI ANSWERS**
