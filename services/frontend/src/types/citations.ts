@@ -46,6 +46,7 @@ export interface UICitationCard {
     source: string;
     retrieved_at: string;
     metadata?: SourceMetadata;
+    raw_data?: Record<string, unknown>;
 }
 
 /**
@@ -111,6 +112,7 @@ export function toUICitationCard(citation: SourceCitation): UICitationCard {
         source: SOURCE_LABELS[citation.source] || citation.source.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
         retrieved_at: citation.retrieved_at,
         metadata: citation.metadata,
+        raw_data: citation.raw_data,
     };
 }
 

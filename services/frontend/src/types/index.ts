@@ -1,3 +1,31 @@
+// Source Citation Types (duplicated from citations.ts to avoid circular imports)
+export interface SourceCitation {
+  id: string;
+  type: string;
+  name: string;
+  description: string;
+  retrieved_at: string;
+  confidence: number;
+  score: number;
+  source: string;
+  source_id: string;
+  raw_data?: Record<string, unknown>;
+  metadata?: {
+    discovered_at?: string;
+    last_seen_at?: string;
+    scan_job_id?: string;
+  };
+}
+
+export {
+  toUICitationCard,
+  getConfidenceLabel,
+  getConfidenceColor,
+  CONFIDENCE_THRESHOLDS,
+  RESOURCE_TYPE_ICONS,
+  SOURCE_LABELS,
+} from './citations';
+
 export interface User {
   id: string;
   username: string;
@@ -10,7 +38,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: string;
-  sources?: Source[];
+  sources?: SourceCitation[];
   actions?: Action[];
   isStreaming?: boolean;
 }
