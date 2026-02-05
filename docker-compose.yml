@@ -112,7 +112,13 @@ services:
       - opsai
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8003/health')",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -142,7 +148,13 @@ services:
       - opsai
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8005/health')",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -182,7 +194,13 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8001/health')",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -228,7 +246,13 @@ services:
           - api-gateway
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -262,7 +286,13 @@ services:
       - opsai
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8002/health')",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -299,7 +329,13 @@ services:
     extra_hosts:
       - "host.docker.internal:host-gateway"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8004/health')",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -336,7 +372,13 @@ services:
       - opsai
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8006/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8006/health')",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -364,7 +406,13 @@ services:
       - opsai
     restart: unless-stopped
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8007/health')"]
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8007/health')",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -388,6 +436,119 @@ services:
     networks:
       - opsai
     restart: unless-stopped
+
+  # Monitoring Service
+  monitoring-service:
+    build:
+      context: ./services/monitoring-service
+      dockerfile: Dockerfile
+    container_name: opsai-monitoring-service
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8009
+      - DATABASE_URL=postgresql://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}_monitoring
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - CELERY_BROKER_URL=redis://redis:6379/2
+      - CELERY_RESULT_BACKEND=redis://redis:6379/3
+      - MONITORED_SERVICES=http://api-gateway:8000,http://ai-router:8001,http://action-engine:8002,http://policy-engine:8003,http://ingestion-service:8004,http://audit-service:8005,http://agent-service:8006,http://discovery-service:8007,http://onboarding-service:8011
+    ports:
+      - "8009:8009"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - opsai
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8009/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Cost Management Service
+  cost-service:
+    build:
+      context: ./services/cost-service
+      dockerfile: Dockerfile
+    container_name: opsai-cost-service
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8010
+      - DATABASE_URL=postgresql://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}_cost
+      - REDIS_URL=redis://redis:6379/4
+      - AWS_COST_EXPLORER_ENABLED=${AWS_COST_EXPLORER_ENABLED:-false}
+      - AWS_REGION=${AWS_REGION:-us-east-1}
+      - AZURE_COST_MANAGEMENT_ENABLED=${AZURE_COST_MANAGEMENT_ENABLED:-false}
+      - GCP_BILLING_ENABLED=${GCP_BILLING_ENABLED:-false}
+      - KUBECOST_ENABLED=${KUBECOST_ENABLED:-false}
+    ports:
+      - "8010:8010"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - opsai
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  rag-service:
+    build:
+      context: ./services/rag-service
+      dockerfile: Dockerfile
+    container_name: opsai-rag-service
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8012
+      - DATABASE_URL=postgresql://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - DATABASE_URL_ASYNC=postgresql+asyncpg://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - REDIS_URL=redis://redis:6379/5
+      - QDRANT_URL=http://qdrant:6333
+      - NATS_URL=nats://nats:4222
+    ports:
+      - "8012:8012"
+    depends_on:
+      python-base:
+        condition: service_completed_successfully
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      nats:
+        condition: service_started
+    networks:
+      - opsai
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8012/health')",
+        ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
 volumes:
   postgres_data:

@@ -24,8 +24,8 @@ from intent_classifier import IntentClassifier
 from conversation_manager import ConversationManager
 from rag_engine import RAGEngine
 from llm_client import OllamaClient
-from query_pipeline import QueryPipeline
-from approval_workflow import ApprovalWorkflow, RiskAssessor
+from approval_workflow import ApprovalWorkflow
+from api.v1.settings import router as settings_router
 from models import (
     QueryRequest,
     QueryResponse,
@@ -113,6 +113,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include routers
+app.include_router(settings_router, prefix="/api/v1")
 
 
 @app.middleware("http")
@@ -523,7 +526,7 @@ async def create_approval(
 ):
     """Create an approval request for an action."""
     try:
-        from conversation_models import RiskLevel, ActionApproval
+        from conversation_models import RiskLevel
         from approval_workflow import ApprovalWorkflow
 
         settings = get_settings()
@@ -559,7 +562,6 @@ async def create_approval(
 @app.get("/approvals/{approval_id}")
 async def get_approval(approval_id: str):
     """Get an approval request by ID."""
-    from approval_workflow import ApprovalWorkflow
     from config import get_settings
 
     settings = get_settings()
@@ -577,7 +579,6 @@ async def get_approval(approval_id: str):
 @app.post("/approvals/{approval_id}/approve")
 async def approve_action(approval_id: str, request: ApprovalActionRequest):
     """Approve an action."""
-    from approval_workflow import ApprovalWorkflow
     from config import get_settings
 
     settings = get_settings()
@@ -607,7 +608,6 @@ async def approve_action(approval_id: str, request: ApprovalActionRequest):
 @app.post("/approvals/{approval_id}/reject")
 async def reject_action(approval_id: str, request: ApprovalActionRequest):
     """Reject an action."""
-    from approval_workflow import ApprovalWorkflow
     from config import get_settings
 
     settings = get_settings()
@@ -617,8 +617,7 @@ async def reject_action(approval_id: str, request: ApprovalActionRequest):
     )
 
     if not request.reason:
-        raise HTTPException(
-            status_code=400, detail="Rejection reason is required")
+        raise HTTPException(status_code=400, detail="Rejection reason is required")
 
     approval = await approval_workflow.reject(
         approval_id=approval_id,
@@ -641,7 +640,6 @@ async def reject_action(approval_id: str, request: ApprovalActionRequest):
 @app.get("/approvals/pending")
 async def list_pending_approvals(limit: int = 50):
     """List all pending approvals."""
-    from approval_workflow import ApprovalWorkflow
     from config import get_settings
 
     settings = get_settings()
@@ -657,7 +655,6 @@ async def list_pending_approvals(limit: int = 50):
 @app.get("/conversations/{conversation_id}/approvals")
 async def get_conversation_approvals(conversation_id: str):
     """Get all approvals for a conversation."""
-    from approval_workflow import ApprovalWorkflow
     from config import get_settings
 
     settings = get_settings()

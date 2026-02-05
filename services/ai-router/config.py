@@ -3,6 +3,7 @@ Configuration settings for AI Router.
 """
 
 from functools import lru_cache
+from typing import Optional
 
 from pydantic_settings import BaseSettings
 
@@ -31,6 +32,42 @@ class Settings(BaseSettings):
     # RAG Configuration
     rag_top_k: int = 5
     rag_similarity_threshold: float = 0.7
+    rag_chunk_size: int = 1000
+    rag_chunk_overlap: int = 200
+    rag_embedding_model: str = "nomic-embed-text"
+
+    # Model Registry Settings
+    model_registry_enabled: bool = True
+    default_chat_model: str = "llama3.3:70b"
+    default_embedding_model: str = "nomic-embed-text"
+    default_code_model: str = "codellama:34b"
+
+    # Provider Configurations (with env var support)
+    openai_api_key: Optional[str] = None
+    anthropic_api_key: Optional[str] = None
+    azure_api_key: Optional[str] = None
+    azure_endpoint: Optional[str] = None
+    azure_api_version: str = "2024-02-01"
+    aws_access_key_id: Optional[str] = None
+    aws_secret_access_key: Optional[str] = None
+    aws_region: str = "us-east-1"
+    ollama_api_key: Optional[str] = None
+
+    # Cost Tracking Settings
+    cost_tracking_enabled: bool = True
+    cost_limit_monthly: Optional[float] = None
+    cost_warning_threshold: float = 0.8
+
+    # Default Model Assignments
+    agent_query_model: str = "llama3.3:70b"
+    agent_action_model: str = "llama3.3:70b"
+    agent_analysis_model: str = "llama3.3:70b"
+    agent_planning_model: str = "llama3.3:70b"
+
+    # Safety Settings
+    safety_approval_threshold: str = "MEDIUM"
+    safety_block_critical_actions: bool = True
+    safety_max_retries: int = 3
 
     # Conversation
     max_conversation_history: int = 20
@@ -42,6 +79,7 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = False
+        extra = "ignore"
 
 
 @lru_cache()

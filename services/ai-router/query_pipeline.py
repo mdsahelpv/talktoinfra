@@ -11,8 +11,6 @@ import structlog
 from conversation_models import (
     ConversationState,
     ConversationWorkflow,
-    QueryContext,
-    RiskLevel,
 )
 from intent_classifier import IntentClassification, IntentClassifier
 from rag_engine import RAGEngine
@@ -163,7 +161,9 @@ Provide a JSON response with:
 
         return {
             "response": self._format_action_response(query, analysis),
-            "sources": [{"type": "intent_classification", "confidence": intent.confidence}],
+            "sources": [
+                {"type": "intent_classification", "confidence": intent.confidence}
+            ],
             "requires_approval": True,
             "analysis": analysis,
         }
@@ -271,8 +271,9 @@ The system couldn't clearly classify this request. Provide a helpful response as
                 f"{payload.get('description', 'No description')}"
             )
 
-        context_str = "\n".join(
-            context_docs) if context_docs else "No relevant context found."
+        context_str = (
+            "\n".join(context_docs) if context_docs else "No relevant context found."
+        )
 
         prompt = f"""You are an infrastructure operations assistant. Answer the user's question based on the retrieved context.
 

@@ -1,0 +1,47 @@
+# RAG Service Requirements
+# FastAPI + Qdrant + Sentence-Transformers
+
+# FastAPI and ASGI
+fastapi>=0.109.0
+uvicorn[standard]>=0.27.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.25
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.9
+
+# Redis
+redis>=5.0.1
+
+# Qdrant (Vector Database)
+qdrant-client>=1.7.3
+
+# Sentence-Transformers (Embeddings)
+sentence-transformers>=2.2.2
+torch>=2.1.0
+
+# Elasticsearch (Optional)
+elasticsearch>=8.11.1
+
+# NATS (Event-driven indexing)
+nats-py>=2.8.0
+
+# Configuration and Logging
+structlog>=24.1.0
+python-dotenv>=1.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.23.0
+pytest-cov>=4.1.0
+httpx>=0.26.0
+
+# Linting and Type Checking
+ruff>=0.2.0
+black>=23.12.0
+mypy>=1.8.0
+
+# Development
+ipython>=8.18.0

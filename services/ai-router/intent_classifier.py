@@ -16,7 +16,9 @@ logger = structlog.get_logger()
 class IntentClassification:
     """Enhanced intent classification result."""
 
-    intent: str  # QUERY, ACTION, DISCOVERY, ONBOARDING, MANAGEMENT, ANALYSIS, HELP, UNKNOWN
+    intent: (
+        str  # QUERY, ACTION, DISCOVERY, ONBOARDING, MANAGEMENT, ANALYSIS, HELP, UNKNOWN
+    )
     confidence: float
     entities: List[Dict[str, Any]]
     action_type: Optional[str] = None
@@ -30,52 +32,144 @@ class IntentClassifier:
 
     # Query intent patterns (read-only)
     QUERY_KEYWORDS = [
-        "show", "list", "get", "find", "search", "display",
-        "what", "where", "which", "how many", "count", "status",
-        "describe", "explain", "tell me", "see", "view", "check",
+        "show",
+        "list",
+        "get",
+        "find",
+        "search",
+        "display",
+        "what",
+        "where",
+        "which",
+        "how many",
+        "count",
+        "status",
+        "describe",
+        "explain",
+        "tell me",
+        "see",
+        "view",
+        "check",
     ]
 
     # Action intent patterns (modifications)
     ACTION_KEYWORDS = [
-        "restart", "stop", "start", "delete", "create", "deploy",
-        "scale", "update", "patch", "exec", "run", "kill",
-        "remove", "rollback", "promote", "drain", "cordon",
-        "uncordon", "taint", "apply", "replace", "edit", "modify",
+        "restart",
+        "stop",
+        "start",
+        "delete",
+        "create",
+        "deploy",
+        "scale",
+        "update",
+        "patch",
+        "exec",
+        "run",
+        "kill",
+        "remove",
+        "rollback",
+        "promote",
+        "drain",
+        "cordon",
+        "uncordon",
+        "taint",
+        "apply",
+        "replace",
+        "edit",
+        "modify",
     ]
 
     # Discovery intent patterns (exploration/scanning)
     DISCOVERY_KEYWORDS = [
-        "discover", "scan", "explore", "find all", "detect",
-        "probe", "enumerate", "crawl", "inventory", "map network",
-        "what's running", "list all", "show all", "get all",
+        "discover",
+        "scan",
+        "explore",
+        "find all",
+        "detect",
+        "probe",
+        "enumerate",
+        "crawl",
+        "inventory",
+        "map network",
+        "what's running",
+        "list all",
+        "show all",
+        "get all",
     ]
 
     # Onboarding intent patterns (adding infrastructure)
     ONBOARDING_KEYWORDS = [
-        "add", "register", "connect", "onboard", "link", "integrate",
-        "import", "install agent", "deploy agent", "new cluster",
-        "new connection", "new infrastructure", "attach", "provision",
+        "add",
+        "register",
+        "connect",
+        "onboard",
+        "link",
+        "integrate",
+        "import",
+        "install agent",
+        "deploy agent",
+        "new cluster",
+        "new connection",
+        "new infrastructure",
+        "attach",
+        "provision",
     ]
 
     # Management intent patterns (settings/users)
     MANAGEMENT_KEYWORDS = [
-        "settings", "configure", "config", "preferences", "user management",
-        "add user", "remove user", "role", "permission", "access",
-        "api key", "token", "webhook", "notification", "alert",
-        "schedule", "automation", "policy", "limits", "quotas",
+        "settings",
+        "configure",
+        "config",
+        "preferences",
+        "user management",
+        "add user",
+        "remove user",
+        "role",
+        "permission",
+        "access",
+        "api key",
+        "token",
+        "webhook",
+        "notification",
+        "alert",
+        "schedule",
+        "automation",
+        "policy",
+        "limits",
+        "quotas",
     ]
 
     # Analysis intent patterns
     ANALYSIS_KEYWORDS = [
-        "analyze", "compare", "trend", "pattern", "why", "explain",
-        "performance", "optimization", "recommend", "suggest",
-        "forecast", "predict", "correlate", "insight", "diagnose",
+        "analyze",
+        "compare",
+        "trend",
+        "pattern",
+        "why",
+        "explain",
+        "performance",
+        "optimization",
+        "recommend",
+        "suggest",
+        "forecast",
+        "predict",
+        "correlate",
+        "insight",
+        "diagnose",
     ]
 
     # Help intent patterns
     HELP_KEYWORDS = [
-        "help", "how do i", "how to", "what can", "assist",
-        "guide", "tutorial", "documentation", "example", "commands",
+        "help",
+        "how do i",
+        "how to",
+        "what can",
+        "assist",
+        "guide",
+        "tutorial",
+        "documentation",
+        "example",
+        "commands",
     ]
 
     # Resource patterns
@@ -106,12 +200,9 @@ class IntentClassifier:
         """Compile regex patterns for efficiency."""
         self._query_pattern = self._compile_or_pattern(self.QUERY_KEYWORDS)
         self._action_pattern = self._compile_or_pattern(self.ACTION_KEYWORDS)
-        self._discovery_pattern = self._compile_or_pattern(
-            self.DISCOVERY_KEYWORDS)
-        self._onboarding_pattern = self._compile_or_pattern(
-            self.ONBOARDING_KEYWORDS)
-        self._management_pattern = self._compile_or_pattern(
-            self.MANAGEMENT_KEYWORDS)
+        self._discovery_pattern = self._compile_or_pattern(self.DISCOVERY_KEYWORDS)
+        self._onboarding_pattern = self._compile_or_pattern(self.ONBOARDING_KEYWORDS)
+        self._management_pattern = self._compile_or_pattern(self.MANAGEMENT_KEYWORDS)
 
     def _compile_or_pattern(self, keywords: List[str]) -> re.Pattern:
         """Compile a regex pattern from keywords."""
@@ -136,8 +227,7 @@ class IntentClassifier:
         discovery_score = len(self._discovery_pattern.findall(query_lower))
         onboarding_score = len(self._onboarding_pattern.findall(query_lower))
         management_score = len(self._management_pattern.findall(query_lower))
-        analysis_score = sum(
-            1 for kw in self.ANALYSIS_KEYWORDS if kw in query_lower)
+        analysis_score = sum(1 for kw in self.ANALYSIS_KEYWORDS if kw in query_lower)
         help_score = sum(1 for kw in self.HELP_KEYWORDS if kw in query_lower)
 
         # Calculate scores with weights
@@ -170,7 +260,8 @@ class IntentClassifier:
 
         # Adjust confidence based on context
         confidence = self._calculate_confidence(
-            query_lower, max_intent, entities, confidence)
+            query_lower, max_intent, entities, confidence
+        )
 
         # Handle ambiguous cases
         if max_score == 0:
@@ -191,8 +282,7 @@ class IntentClassifier:
 
         if max_intent in ["ACTION", "QUERY", "DISCOVERY"]:
             action_type = self._extract_action_type(query_lower)
-            target_resource = self._extract_target_resource(
-                query_lower, entities)
+            target_resource = self._extract_target_resource(query_lower, entities)
 
         return IntentClassification(
             intent=max_intent,
@@ -233,8 +323,7 @@ class IntentClassifier:
             adjusted["QUERY"] *= 1.2
 
         # Check for time-based queries
-        time_patterns = [r"\b(last|this|past|ago)\b",
-                         r"\b(current|now|today)\b"]
+        time_patterns = [r"\b(last|this|past|ago)\b", r"\b(current|now|today)\b"]
         for pattern in time_patterns:
             if re.search(pattern, query):
                 adjusted["QUERY"] *= 1.1
@@ -326,11 +415,13 @@ class IntentClassifier:
         # Extract resource types
         for resource, pattern in self.RESOURCE_PATTERNS.items():
             if re.search(pattern, query_lower):
-                entities.append({
-                    "type": "resource",
-                    "value": resource,
-                    "confidence": 0.9,
-                })
+                entities.append(
+                    {
+                        "type": "resource",
+                        "value": resource,
+                        "confidence": 0.9,
+                    }
+                )
 
         # Extract namespace references
         namespace_patterns = [
@@ -345,40 +436,48 @@ class IntentClassifier:
                 namespace = match.group(1)
                 # Avoid matching known resource names as namespaces
                 if namespace not in {"default", "kube-system", "kube-public"}:
-                    entities.append({
-                        "type": "namespace",
-                        "value": namespace,
-                        "confidence": 0.95,
-                    })
+                    entities.append(
+                        {
+                            "type": "namespace",
+                            "value": namespace,
+                            "confidence": 0.95,
+                        }
+                    )
                 break
 
         # Extract labels/selectors
         label_pattern = r"(?:with|where|having) (\w+)=(\w+)"
         for match in re.finditer(label_pattern, query_lower):
-            entities.append({
-                "type": "label_selector",
-                "key": match.group(1),
-                "value": match.group(2),
-                "confidence": 0.85,
-            })
+            entities.append(
+                {
+                    "type": "label_selector",
+                    "key": match.group(1),
+                    "value": match.group(2),
+                    "confidence": 0.85,
+                }
+            )
 
         # Extract quoted names
         quoted = re.findall(r'"([^"]*)"', query)
         for name in quoted:
-            entities.append({
-                "type": "named_resource",
-                "value": name,
-                "confidence": 0.95,
-            })
+            entities.append(
+                {
+                    "type": "named_resource",
+                    "value": name,
+                    "confidence": 0.95,
+                }
+            )
 
         # Extract numbers (replicas, ports, etc.)
         numbers = re.findall(r"\b(\d+)\b", query)
         for num in numbers[:3]:  # Limit to first 3
-            entities.append({
-                "type": "numeric",
-                "value": num,
-                "confidence": 0.7,
-            })
+            entities.append(
+                {
+                    "type": "numeric",
+                    "value": num,
+                    "confidence": 0.7,
+                }
+            )
 
         return entities
 
@@ -405,14 +504,12 @@ class IntentClassifier:
     ) -> Optional[str]:
         """Extract target resource from query."""
         # Look for resource entities
-        resource_entities = [
-            e for e in entities if e.get("type") == "resource"]
+        resource_entities = [e for e in entities if e.get("type") == "resource"]
         if resource_entities:
             return resource_entities[0]["value"]
 
         # Look for named resources
-        named_entities = [e for e in entities if e.get(
-            "type") == "named_resource"]
+        named_entities = [e for e in entities if e.get("type") == "named_resource"]
         if named_entities:
             return named_entities[0]["value"]
 

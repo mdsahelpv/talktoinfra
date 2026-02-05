@@ -66,16 +66,13 @@ class IntentClassification(BaseModel):
     """Intent classification result - extended."""
 
     intent: IntentType = Field(..., description="Classified intent type")
-    confidence: float = Field(..., ge=0.0, le=1.0,
-                              description="Confidence score")
-    entities: List[Dict[str, Any]] = Field(
-        default=[], description="Extracted entities")
-    action_type: Optional[str] = Field(
-        None, description="Detected action type")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
+    entities: List[Dict[str, Any]] = Field(default=[], description="Extracted entities")
+    action_type: Optional[str] = Field(None, description="Detected action type")
     target_resource: Optional[str] = Field(
-        None, description="Target resource reference")
-    requires_approval: bool = Field(
-        default=False, description="Requires approval")
+        None, description="Target resource reference"
+    )
+    requires_approval: bool = Field(default=False, description="Requires approval")
     risk_level: Optional[RiskLevel] = Field(None, description="Risk level")
 
 
@@ -86,8 +83,7 @@ class ConversationMessage(BaseModel):
     role: MessageRole = Field(..., description="Message role")
     content: str = Field(..., min_length=1, description="Message content")
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    metadata: Dict[str, Any] = Field(
-        default={}, description="Additional metadata")
+    metadata: Dict[str, Any] = Field(default={}, description="Additional metadata")
 
 
 class ConversationBase(BaseModel):
@@ -104,10 +100,10 @@ class Conversation(ConversationBase):
     """Full conversation model with messages."""
 
     messages: List[ConversationMessage] = Field(
-        default=[], description="Message history")
+        default=[], description="Message history"
+    )
     state: ConversationState = Field(default=ConversationState.NEW)
-    metadata: Dict[str, Any] = Field(
-        default={}, description="Additional metadata")
+    metadata: Dict[str, Any] = Field(default={}, description="Additional metadata")
 
 
 class ConversationListItem(BaseModel):
@@ -128,20 +124,16 @@ class ConversationCreateRequest(BaseModel):
 
     user_id: str = Field(..., description="User identifier")
     title: Optional[str] = Field(None, description="Optional title")
-    metadata: Optional[Dict[str, Any]] = Field(
-        None, description="Optional metadata")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Optional metadata")
 
 
 class QueryRequest(BaseModel):
     """Query request model."""
 
-    query: str = Field(..., min_length=1, max_length=10000,
-                       description="User query")
-    conversation_id: Optional[str] = Field(
-        None, description="Existing conversation ID")
+    query: str = Field(..., min_length=1, max_length=10000, description="User query")
+    conversation_id: Optional[str] = Field(None, description="Existing conversation ID")
     user_id: str = Field(..., description="User identifier")
-    context: Optional[Dict[str, Any]] = Field(
-        None, description="Additional context")
+    context: Optional[Dict[str, Any]] = Field(None, description="Additional context")
 
 
 class SourceType(str, Enum):
@@ -160,10 +152,10 @@ class QuerySource(BaseModel):
     type: SourceType = Field(..., description="Source type")
     resource_id: Optional[str] = Field(None, description="Resource identifier")
     resource_type: Optional[str] = Field(None, description="Resource type")
-    confidence: float = Field(..., ge=0.0, le=1.0,
-                              description="Confidence score")
+    confidence: float = Field(..., ge=0.0, le=1.0, description="Confidence score")
     metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Additional metadata")
+        default_factory=dict, description="Additional metadata"
+    )
 
 
 class QueryResponse(BaseModel):
@@ -171,14 +163,14 @@ class QueryResponse(BaseModel):
 
     response: str = Field(..., description="Generated response text")
     conversation_id: str = Field(..., description="Conversation identifier")
-    intent: IntentClassification = Field(...,
-                                         description="Intent classification")
-    sources: List[QuerySource] = Field(
-        default=[], description="Information sources")
+    intent: IntentClassification = Field(..., description="Intent classification")
+    sources: List[QuerySource] = Field(default=[], description="Information sources")
     workflow_state: Optional[str] = Field(
-        None, description="Workflow state if applicable")
+        None, description="Workflow state if applicable"
+    )
     metadata: Dict[str, Any] = Field(
-        default_factory=dict, description="Response metadata")
+        default_factory=dict, description="Response metadata"
+    )
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
 
@@ -188,15 +180,12 @@ class ActionApprovalRequest(BaseModel):
     conversation_id: str = Field(..., description="Related conversation ID")
     user_id: str = Field(..., description="Requesting user")
     action_type: str = Field(..., description="Type of action")
-    target_resources: List[str] = Field(
-        default=[], description="Target resources")
+    target_resources: List[str] = Field(default=[], description="Target resources")
     description: str = Field(..., description="Human-readable description")
     risk_level: RiskLevel = Field(..., description="Risk assessment")
     impact_summary: str = Field(..., description="Expected impact")
-    rollback_plan: Optional[str] = Field(
-        None, description="Rollback instructions")
-    metadata: Optional[Dict[str, Any]] = Field(
-        None, description="Additional metadata")
+    rollback_plan: Optional[str] = Field(None, description="Rollback instructions")
+    metadata: Optional[Dict[str, Any]] = Field(None, description="Additional metadata")
 
 
 class ApprovalResponse(BaseModel):
@@ -250,7 +239,8 @@ class RAGDocument(BaseModel):
     id: str = Field(..., description="Document identifier")
     score: float = Field(..., ge=0.0, le=1.0, description="Similarity score")
     payload: Dict[str, Any] = Field(
-        default_factory=dict, description="Document payload")
+        default_factory=dict, description="Document payload"
+    )
     resource_type: Optional[str] = Field(None, description="Resource type")
 
 
@@ -260,8 +250,7 @@ class LLMResponse(BaseModel):
     text: str = Field(..., description="Generated text")
     model: str = Field(..., description="Model used for generation")
     tokens_used: Optional[int] = Field(None, description="Tokens consumed")
-    finish_reason: Optional[str] = Field(
-        None, description="Reason for completion")
+    finish_reason: Optional[str] = Field(None, description="Reason for completion")
 
 
 class HealthStatus(BaseModel):
@@ -271,4 +260,5 @@ class HealthStatus(BaseModel):
     service: str = Field(..., description="Service name")
     timestamp: float = Field(..., description="Timestamp")
     components: Dict[str, str] = Field(
-        default_factory=dict, description="Component statuses")
+        default_factory=dict, description="Component statuses"
+    )

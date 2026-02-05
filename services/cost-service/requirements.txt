@@ -1,0 +1,42 @@
+# FastAPI and Web Framework
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+pydantic>=2.5.0
+pydantic-settings>=2.1.0
+
+# Database
+sqlalchemy[asyncio]>=2.0.0
+asyncpg>=0.29.0
+psycopg2-binary>=2.9.0
+alembic>=1.12.0
+
+# Data Processing
+pandas>=2.0.0
+numpy>=1.24.0
+
+# Logging
+structlog>=23.2.0
+
+# HTTP Client
+httpx>=0.25.0
+
+# Cloud Providers (optional - install based on needs)
+# boto3>=1.33.0  # AWS
+# azure-identity>=1.15.0  # Azure
+# azure-mgmt-consumption>=10.0.0  # Azure Cost Management
+# google-cloud-billing>=1.13.0  # GCP
+# google-cloud-bigquery>=3.14.0  # GCP BigQuery for exports
+
+# Redis (caching)
+redis>=5.0.0
+
+# Testing
+pytest>=7.4.0
+pytest-asyncio>=0.21.0
+pytest-cov>=4.1.0
+httpx>=0.25.0
+
+# Development
+black>=23.0.0
+ruff>=0.1.0
+mypy>=1.7.0

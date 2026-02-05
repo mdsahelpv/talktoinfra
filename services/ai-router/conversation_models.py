@@ -58,13 +58,11 @@ class ActionApproval(BaseModel):
     conversation_id: str = Field(..., description="Related conversation ID")
     user_id: str = Field(..., description="Requesting user")
     action_type: str = Field(..., description="Type of action")
-    target_resources: List[str] = Field(
-        default=[], description="Target resource names")
+    target_resources: List[str] = Field(default=[], description="Target resource names")
     description: str = Field(..., description="Human-readable description")
     risk_level: RiskLevel = Field(..., description="Risk assessment")
     impact_summary: str = Field(..., description="Expected impact")
-    rollback_plan: Optional[str] = Field(
-        None, description="Rollback instructions")
+    rollback_plan: Optional[str] = Field(None, description="Rollback instructions")
     status: ApprovalStatus = Field(default=ApprovalStatus.PENDING)
     approver_id: Optional[str] = Field(None, description="Approver user ID")
     approved_at: Optional[datetime] = Field(None)
@@ -90,11 +88,19 @@ class ConversationWorkflow(BaseModel):
     completed_at: Optional[datetime] = None
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
-    def transition(self, new_state: ConversationState, reason: Optional[str] = None) -> TransitionResult:
+    def transition(
+        self, new_state: ConversationState, reason: Optional[str] = None
+    ) -> TransitionResult:
         """Attempt state transition."""
         valid_transitions = {
-            ConversationState.NEW: [ConversationState.ACKNOWLEDGED, ConversationState.CANCELLED],
-            ConversationState.ACKNOWLEDGED: [ConversationState.PROCESSING, ConversationState.CANCELLED],
+            ConversationState.NEW: [
+                ConversationState.ACKNOWLEDGED,
+                ConversationState.CANCELLED,
+            ],
+            ConversationState.ACKNOWLEDGED: [
+                ConversationState.PROCESSING,
+                ConversationState.CANCELLED,
+            ],
             ConversationState.PROCESSING: [
                 ConversationState.PENDING_APPROVAL,
                 ConversationState.EXECUTING,
@@ -126,7 +132,11 @@ class ConversationWorkflow(BaseModel):
 
         self.current_state = new_state
 
-        if new_state in [ConversationState.COMPLETED, ConversationState.FAILED, ConversationState.CANCELLED]:
+        if new_state in [
+            ConversationState.COMPLETED,
+            ConversationState.FAILED,
+            ConversationState.CANCELLED,
+        ]:
             self.completed_at = datetime.utcnow()
 
         return TransitionResult(

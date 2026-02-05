@@ -9,8 +9,10 @@ import {
   ChevronRight,
   Save,
   Scan,
+  Brain,
 } from 'lucide-react';
 import InfrastructureDiscovery from '@/components/settings/InfrastructureDiscovery';
+import AISettings from '@/pages/Settings/AISettings';
 import toast from 'react-hot-toast';
 import {
   Card,
@@ -181,6 +183,19 @@ export default function SettingsPage() {
         </CardHeader>
         <CardContent>
           <InfrastructureDiscovery />
+        </CardContent>
+      </Card>
+
+      {/* AI Engine Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Brain className="h-5 w-5" />
+            AI Engine
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <AISettings />
         </CardContent>
       </Card>
 

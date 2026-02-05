@@ -8,7 +8,6 @@ from datetime import datetime, timedelta
 from typing import Any, Dict, List, Optional
 
 import structlog
-from pydantic import BaseModel
 
 from conversation_models import (
     ActionApproval,
@@ -37,6 +36,7 @@ class ApprovalWorkflow:
     async def _get_redis(self):
         """Get Redis connection."""
         import redis.asyncio as redis
+
         if self._redis is None:
             self._redis = await redis.from_url(
                 self.redis_url, encoding="utf-8", decode_responses=True
@@ -108,7 +108,9 @@ class ApprovalWorkflow:
         )
 
         # Also index by conversation for lookup
-        await redis_client.sadd(f"conversation_approvals:{conversation_id}", approval_id)
+        await redis_client.sadd(
+            f"conversation_approvals:{conversation_id}", approval_id
+        )
 
         logger.info(
             "approval_created",
@@ -281,15 +283,13 @@ class ApprovalWorkflow:
         approval.status = ApprovalStatus.EXPIRED
         await self._update_approval(approval)
 
-        logger.info("approval_cancelled",
-                    approval_id=approval_id, user_id=user_id)
+        logger.info("approval_cancelled", approval_id=approval_id, user_id=user_id)
         return True
 
     async def _update_approval(self, approval: ActionApproval):
         """Update approval in storage."""
         redis_client = await self._get_redis()
-        remaining = int(
-            (approval.expires_at - datetime.utcnow()).total_seconds())
+        remaining = int((approval.expires_at - datetime.utcnow()).total_seconds())
         if remaining > 0:
             await redis_client.setex(
                 f"approval:{approval.id}",
@@ -339,7 +339,10 @@ class ApprovalWorkflow:
             data = await redis_client.get(key)
             if data:
                 approval = ActionApproval.model_validate_json(data)
-                if approval.status == ApprovalStatus.PENDING and datetime.utcnow() > approval.expires_at:
+                if (
+                    approval.status == ApprovalStatus.PENDING
+                    and datetime.utcnow() > approval.expires_at
+                ):
                     approval.status = ApprovalStatus.EXPIRED
                     await redis_client.setex(
                         key,
@@ -449,8 +452,7 @@ class RiskAssessor:
             impact_parts.append(
                 "⚠️ CRITICAL: This operation may cause service disruption."
             )
-            impact_parts.append(
-                "Recommended: Notify stakeholders before proceeding.")
+            impact_parts.append("Recommended: Notify stakeholders before proceeding.")
         elif risk_level == RiskLevel.HIGH:
             impact_parts.append(
                 "⚠️ HIGH: This operation may cause temporary service interruption."
