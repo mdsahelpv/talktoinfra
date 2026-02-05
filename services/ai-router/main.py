@@ -25,6 +25,7 @@ from conversation_manager import ConversationManager
 from rag_engine import RAGEngine
 from llm_client import OllamaClient
 from approval_workflow import ApprovalWorkflow
+from source_citations import SourceCitationEngine, CitationFormatter, CitationSet, SourceCitation
 from api.v1.settings import router as settings_router
 from models import (
     QueryRequest,
@@ -59,12 +60,13 @@ intent_classifier: Optional[IntentClassifier] = None
 conversation_manager: Optional[ConversationManager] = None
 rag_engine: Optional[RAGEngine] = None
 llm_client: Optional[OllamaClient] = None
+citation_engine: Optional[SourceCitationEngine] = None
 
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan management."""
-    global intent_classifier, conversation_manager, rag_engine, llm_client
+    global intent_classifier, conversation_manager, rag_engine, llm_client, citation_engine
 
     settings = get_settings()
 
@@ -78,6 +80,8 @@ async def lifespan(app: FastAPI):
     rag_engine = RAGEngine(
         qdrant_url=settings.qdrant_url, ollama_host=settings.ollama_host
     )
+    citation_engine = SourceCitationEngine(
+        confidence_threshold=settings.rag_similarity_threshold)
     llm_client = OllamaClient(
         host=settings.ollama_host,
         model_chat=settings.ollama_model_chat,
@@ -278,52 +282,157 @@ async def process_query_stream(request: Request, query: QueryRequest):
 async def build_context(
     query: QueryRequest, intent: IntentClassification, conversation: Any
 ) -> Dict[str, Any]:
-    """Build context for query processing."""
+    """Build context for query processing with Hierarchical RAG."""
+    global citation_engine
+
     context = {
         "conversation_history": conversation.messages[-5:] if conversation else [],
         "user_context": query.context or {},
         "timestamp": time.time(),
     }
 
-    # Add RAG-retrieved context for relevant intents
+    # Add RAG-retrieved context for relevant intents with hierarchical retrieval
     if intent.intent in ["QUERY", "ANALYSIS"]:
-        rag_results = await rag_engine.retrieve(query.query, top_k=5)
-        context["retrieved_documents"] = rag_results
+        query_start_time = time.time()
+
+        # Level 1: Semantic search (top 5 most relevant)
+        rag_results_level1 = await rag_engine.retrieve(query.query, top_k=5)
+
+        # Level 2: Related documents (next 5)
+        rag_results_level2 = await rag_engine.retrieve(query.query, top_k=5,
+                                                       filter_conditions={"must_not": [{"key": "id", "match": {"value": [d.get("id") for d in rag_results_level1]}}]})
+
+        # Check if this is a "list all" query that needs structured DB fallback
+        if _is_list_all_query(query.query):
+            # Use structured database query instead of RAG
+            structured_results = await _get_structured_results(query.query, intent)
+            context["structured_results"] = structured_results
+            context["use_structured_fallback"] = True
+
+        context["retrieved_documents"] = rag_results_level1
+        context["related_documents"] = rag_results_level2
+
+        # Create citations using citation_engine
+        if citation_engine:
+            citations = await citation_engine.create_citations_from_rag(
+                rag_results_level1, query_start_time
+            )
+            context["citations"] = citations
+        else:
+            # Fallback: convert RAG results to citations manually
+            context["citations"] = _create_fallback_citations(
+                rag_results_level1)
 
     return context
+
+
+def _is_list_all_query(query: str) -> bool:
+    """Check if query is a "list all" type that needs structured DB fallback."""
+    list_patterns = [
+        r"^list all",
+        r"^show me all",
+        r"^get all",
+        r"^what do i have",
+        r"^list \\w+$",
+    ]
+    import re
+    query_lower = query.lower().strip()
+    for pattern in list_patterns:
+        if re.match(pattern, query_lower):
+            return True
+    return False
+
+
+async def _get_structured_results(query: str, intent: IntentClassification) -> Dict[str, Any]:
+    """Get results from structured database for "list all" queries."""
+    # This would query PostgreSQL directly for accurate counts/lists
+    # For now, return empty - implementation depends on discovery service
+    return {
+        "type": "structured_fallback",
+        "message": "Structured DB query would be executed here",
+        "query": query,
+        "entities": intent.entities,
+    }
+
+
+def _create_fallback_citations(rag_results: List[Dict[str, Any]]) -> CitationSet:
+    """Create citations from RAG results when citation_engine is unavailable."""
+    from source_citations import CitationSet
+    citations = CitationSet()
+
+    for doc in rag_results:
+        from source_citations import SourceCitation
+        citation = SourceCitation.from_rag_result(doc)
+        citations.add_source(citation)
+
+    return citations
 
 
 async def handle_query_intent(
     query: QueryRequest, context: Dict[str, Any], intent: IntentClassification
 ) -> tuple[str, List[Any]]:
-    """Handle information retrieval queries."""
+    """Handle information retrieval queries with proper source citations."""
+    global citation_engine
 
-    # Build RAG prompt
+    # Get citations from context
+    citations = context.get("citations")
     rag_docs = context.get("retrieved_documents", [])
-    prompt = f"""You are an infrastructure operations assistant answering questions based on the provided context.
+    related_docs = context.get("related_documents", [])
+    use_structured = context.get("use_structured_fallback", False)
 
-Context from infrastructure search:
-{format_rag_context(rag_docs)}
+    # Build RAG prompt with citations included
+    if use_structured and "structured_results" in context:
+        # Use structured DB results for "list all" queries
+        structured = context["structured_results"]
+        prompt = f"""You are an infrastructure operations assistant answering questions based on structured data.
+
+Structured Query Results:
+{structured.get('message', '')}
 
 User Question: {query.query}
 
-Provide a clear, concise answer. If you reference specific resources, mention them by name.
+Provide a clear, concise answer. Include the count/summary of resources found.
+"""
+        response = await llm_client.generate(prompt)
+        sources = [structured]
+    else:
+        # Use RAG results with proper citations
+        prompt = f"""You are an infrastructure operations assistant answering questions based on the provided context.
+
+Context from infrastructure search (Level 1 - Most Relevant):
+{format_rag_context(rag_docs)}
+
+Context from related resources (Level 2):
+{format_rag_context(related_docs)}
+
+User Question: {query.query}
+
+Provide a clear, concise answer. Cite your sources using the format: [Source: <name>].
+If you reference specific resources, mention them by name.
 If the context doesn't contain the answer, say so and suggest what information might be needed.
 """
 
-    response = await llm_client.generate(prompt)
+        response = await llm_client.generate(prompt)
 
-    # Convert RAG results to sources
-    sources = [
-        {
-            "type": "vector_search",
-            "resource_id": doc.get("id"),
-            "resource_type": doc.get("resource_type"),
-            "confidence": doc.get("score", 0.0),
-            "metadata": doc.get("payload", {}),
-        }
-        for doc in rag_docs
-    ]
+        # Format response with citations using citation_engine
+        if citation_engine and citations:
+            formatted = citation_engine.format_response_with_citations(
+                response, citations, include_raw_data=False
+            )
+            response = formatted["response"]
+            sources = formatted["sources"]
+        else:
+            # Fallback: convert RAG results to sources manually
+            sources = [
+                {
+                    "type": "vector_search",
+                    "resource_id": doc.get("id"),
+                    "resource_type": doc.get("resource_type"),
+                    "confidence": doc.get("score", 0.0),
+                    "metadata": doc.get("payload", {}),
+                }
+                for doc in rag_docs
+            ]
 
     return response, sources
 
@@ -617,7 +726,8 @@ async def reject_action(approval_id: str, request: ApprovalActionRequest):
     )
 
     if not request.reason:
-        raise HTTPException(status_code=400, detail="Rejection reason is required")
+        raise HTTPException(
+            status_code=400, detail="Rejection reason is required")
 
     approval = await approval_workflow.reject(
         approval_id=approval_id,
