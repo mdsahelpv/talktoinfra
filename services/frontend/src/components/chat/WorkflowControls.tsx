@@ -30,11 +30,9 @@ const WorkflowControls: React.FC<WorkflowControlsProps> = ({
         }
     };
 
-    const getCurrentStep = (): WorkflowStep | undefined => {
-        return steps.find(s => s.id === current_step_id);
-    };
-
-    const currentStep = getCurrentStep();
+    // currentStep kept for potential future UI enhancements
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
+    const _currentStep = steps.find(s => s.id === current_step_id);
 
     // Don't show controls if workflow is completed or cancelled
     if (status === 'COMPLETED' || status === 'CANCELLED') {

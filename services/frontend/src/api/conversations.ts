@@ -13,6 +13,11 @@ import type {
     WorkflowExecutionRequest,
     WorkflowControlRequest,
     WorkflowProgressUpdate,
+    ClusterInfo,
+    NamespaceInfo,
+    UserPreferences,
+    ClusterContext,
+    OutputFormat,
 } from '@/types/conversation';
 
 const AI_ROUTER_URL = import.meta.env.VITE_AI_ROUTER_URL || '';
@@ -174,4 +179,60 @@ export const conversationsApi = {
             user_id: userId,
             reason,
         }),
+
+    // Cluster Context API
+    listClusters: () =>
+        apiClient.get<ClusterInfo[]>('/api/v1/clusters'),
+
+    getCluster: (clusterId: string) =>
+        apiClient.get<ClusterInfo>(`/api/v1/clusters/${clusterId}`),
+
+    getClusterNamespaces: (clusterId: string) =>
+        apiClient.get<NamespaceInfo[]>(`/api/v1/clusters/${clusterId}/namespaces`),
+
+    testClusterConnection: (clusterId: string) =>
+        apiClient.post<{ success: boolean; message: string }>(`/api/v1/clusters/${clusterId}/test-connection`),
+
+    // User Preferences API
+    getUserPreferences: (userId: string) =>
+        apiClient.get<UserPreferences>(`/api/v1/users/${userId}/preferences`),
+
+    updateUserPreferences: (userId: string, preferences: Partial<UserPreferences>) =>
+        apiClient.post<UserPreferences>(`/api/v1/users/${userId}/preferences`, preferences),
+
+    updatePreferredCluster: (userId: string, clusterId: string | null) =>
+        apiClient.post<UserPreferences>(`/api/v1/users/${userId}/preferences/preferred-cluster`, { cluster_id: clusterId }),
+
+    updatePreferredOutputFormat: (userId: string, format: OutputFormat) =>
+        apiClient.post<UserPreferences>(`/api/v1/users/${userId}/preferences/output-format`, { format }),
+
+    addQueryToHistory: (userId: string, query: { query: string; cluster_id?: string; namespace?: string; result_count?: number }) =>
+        apiClient.post<UserPreferences>(`/api/v1/users/${userId}/preferences/query-history`, query),
+
+    clearQueryHistory: (userId: string) =>
+        apiClient.delete(`/api/v1/users/${userId}/preferences/query-history`),
+
+    getQuerySuggestions: (userId: string, context?: { cluster_id?: string; namespace?: string }) => {
+        const queryParams = new URLSearchParams();
+        if (context?.cluster_id) queryParams.set('cluster_id', context.cluster_id);
+        if (context?.namespace) queryParams.set('namespace', context.namespace);
+        return apiClient.get<string[]>(`/api/v1/users/${userId}/preferences/query-suggestions?${queryParams.toString()}`);
+    },
+
+    // Remember namespace per cluster
+    rememberNamespace: (userId: string, clusterId: string, namespace: string) =>
+        apiClient.post<UserPreferences>(`/api/v1/users/${userId}/preferences/remember-namespace`, { cluster_id: clusterId, namespace }),
+
+    forgetNamespace: (userId: string, clusterId: string, namespace: string) => {
+        const queryParams = new URLSearchParams();
+        queryParams.set('cluster_id', clusterId);
+        queryParams.set('namespace', namespace);
+        return apiClient.delete(`/api/v1/users/${userId}/preferences/remember-namespace?${queryParams.toString()}`);
+    },
+    // Cluster Context Persistence
+    saveClusterContext: (userId: string, context: ClusterContext) =>
+        apiClient.post<UserPreferences>(`/api/v1/users/${userId}/preferences/cluster-context`, context),
+
+    loadClusterContext: (userId: string) =>
+        apiClient.get<ClusterContext>(`/api/v1/users/${userId}/preferences/cluster-context`),
 };

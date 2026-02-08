@@ -5,7 +5,9 @@ import type {
     QueryResultMetadata,
     PaginationState,
     FilterState,
-    SortState
+    SortState,
+    ClusterQueryResult,
+    CrossClusterQueryMetadata,
 } from '@/types/conversation';
 import { QueryResultPagination } from './QueryResultPagination';
 import { QueryResultFilters } from './QueryResultFilters';
@@ -18,7 +20,12 @@ import {
     Download,
     Bell,
     Filter,
-    BarChart3
+    BarChart3,
+    Globe,
+    Server,
+    CheckCircle,
+    AlertCircle,
+    XCircle,
 } from 'lucide-react';
 
 interface QueryResultProps {
@@ -28,7 +35,27 @@ interface QueryResultProps {
     showSources?: boolean;
     metadata?: QueryResultMetadata;
     parsedData?: Record<string, unknown>[];
+    // Cross-cluster support
+    crossClusterMetadata?: CrossClusterQueryMetadata;
+    clusterResults?: ClusterQueryResult[];
+    showClusterBadges?: boolean;
 }
+
+// Cluster badge colors
+const CLUSTER_BADGE_COLORS: Record<string, string> = {
+    default: 'bg-gray-100 text-gray-800 border-gray-200',
+    aws: 'bg-orange-100 text-orange-800 border-orange-200',
+    gcp: 'bg-blue-100 text-blue-800 border-blue-200',
+    azure: 'bg-indigo-100 text-indigo-800 border-indigo-200',
+    onprem: 'bg-purple-100 text-purple-800 border-purple-200',
+};
+
+// Status icons
+const STATUS_ICONS: Record<string, React.ReactNode> = {
+    success: <CheckCircle className="w-4 h-4 text-green-500" />,
+    error: <XCircle className="w-4 h-4 text-red-500" />,
+    partial: <AlertCircle className="w-4 h-4 text-yellow-500" />,
+};
 
 const SOURCE_ICONS: Record<string, string> = {
     vector_search: '📚',
@@ -85,6 +112,9 @@ export const QueryResult: React.FC<QueryResultProps> = ({
     showSources = true,
     metadata,
     parsedData = [],
+    crossClusterMetadata,
+    clusterResults,
+    showClusterBadges = true,
 }) => {
     const [showAllSources, setShowAllSources] = useState(false);
 
@@ -232,8 +262,8 @@ export const QueryResult: React.FC<QueryResultProps> = ({
                     <button
                         onClick={() => setShowFilters(!showFilters)}
                         className={`flex items-center gap-2 px-3 py-1.5 text-sm rounded-lg border transition-colors ${filters.preset !== 'all' || filters.searchQuery
-                                ? 'bg-blue-50 border-blue-200 text-blue-700'
-                                : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
+                            ? 'bg-blue-50 border-blue-200 text-blue-700'
+                            : 'bg-white border-gray-300 text-gray-700 hover:bg-gray-50'
                             }`}
                     >
                         <Filter className="w-4 h-4" />
@@ -268,6 +298,92 @@ export const QueryResult: React.FC<QueryResultProps> = ({
                     availableFields={availableFilterFields}
                     resultType={metadata?.resultType}
                 />
+            )}
+
+            {/* Cross-Cluster Results */}
+            {crossClusterMetadata && clusterResults && clusterResults.length > 0 && (
+                <div className="space-y-4">
+                    {/* Cross-cluster header */}
+                    <div className="flex items-center gap-3 p-3 bg-blue-50 rounded-lg border border-blue-200">
+                        <Globe className="w-5 h-5 text-blue-600" />
+                        <div className="flex-1">
+                            <span className="font-medium text-blue-900">
+                                Cross-Cluster Query Results
+                            </span>
+                            <p className="text-sm text-blue-700">
+                                Query executed across {crossClusterMetadata.target_clusters.length} cluster(s)
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <span className="text-2xl font-bold text-blue-700">
+                                {crossClusterMetadata.aggregated_count.toLocaleString()}
+                            </span>
+                            <span className="block text-xs text-blue-600">Total results</span>
+                        </div>
+                    </div>
+
+                    {/* Cluster results breakdown */}
+                    <div className="grid gap-3">
+                        {clusterResults.map((result) => (
+                            <div
+                                key={result.cluster_id}
+                                className={`p-4 rounded-lg border ${result.status === 'error'
+                                    ? 'bg-red-50 border-red-200'
+                                    : result.status === 'partial'
+                                        ? 'bg-yellow-50 border-yellow-200'
+                                        : 'bg-white border-gray-200'
+                                    }`}
+                            >
+                                <div className="flex items-center justify-between mb-3">
+                                    <div className="flex items-center gap-2">
+                                        {STATUS_ICONS[result.status]}
+                                        <Server className="w-4 h-4 text-gray-500" />
+                                        <span className="font-medium text-gray-900">
+                                            {result.cluster_name}
+                                        </span>
+                                        {result.namespace && (
+                                            <span className="text-sm text-gray-500">
+                                                ({result.namespace})
+                                            </span>
+                                        )}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        <span className={`px-2 py-1 text-sm rounded-full ${result.status === 'success'
+                                                ? 'bg-green-100 text-green-800'
+                                                : result.status === 'partial'
+                                                    ? 'bg-yellow-100 text-yellow-800'
+                                                    : 'bg-red-100 text-red-800'
+                                            }`}>
+                                            {result.total_count} result{result.total_count !== 1 ? 's' : ''}
+                                        </span>
+                                        <span className="text-xs text-gray-500">
+                                            {result.execution_time_ms}ms
+                                        </span>
+                                    </div>
+                                </div>
+
+                                {result.status === 'error' && result.error_message && (
+                                    <div className="p-2 bg-red-100 rounded text-sm text-red-700">
+                                        {result.error_message}
+                                    </div>
+                                )}
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Cross-cluster summary */}
+                    <div className="flex items-center gap-4 text-sm text-gray-600">
+                        <span>
+                            Total execution time: <strong>{crossClusterMetadata.execution_time_ms}ms</strong>
+                        </span>
+                        {crossClusterMetadata.namespaces_scoped && (
+                            <span className="flex items-center gap-1">
+                                <Filter className="w-4 h-4" />
+                                Namespace-scoped query
+                            </span>
+                        )}
+                    </div>
+                </div>
             )}
 
             {/* Main Response */}

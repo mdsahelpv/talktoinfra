@@ -585,7 +585,138 @@ export interface WorkflowProgressUpdate {
     timestamp: string;
 }
 
-// Component prop types
+// Cross-Cluster Context Types
+
+export type ClusterContextMode = 'single' | 'all';
+
+export interface ClusterInfo {
+    id: string;
+    name: string;
+    provider?: 'aws' | 'gcp' | 'azure' | 'onprem' | 'other';
+    region?: string;
+    status: 'connected' | 'disconnected' | 'error';
+    last_connected_at?: string;
+}
+
+export interface NamespaceInfo {
+    id: string;
+    name: string;
+    cluster_id: string;
+    status: 'active' | 'terminating' | 'unknown';
+    resource_count?: number;
+}
+
+export interface ClusterContext {
+    mode: ClusterContextMode;
+    selected_cluster_id: string | null;
+    selected_namespace: string | null;
+    available_clusters: ClusterInfo[];
+    available_namespaces: NamespaceInfo[];
+}
+
+export interface ClusterContextState {
+    current: ClusterContext;
+    last_updated: string;
+}
+
+// User Preferences Types
+
+export type OutputFormat = 'table' | 'json' | 'yaml' | 'summary';
+
+export interface UserQueryHistory {
+    query: string;
+    timestamp: string;
+    cluster_id?: string;
+    namespace?: string;
+    result_count?: number;
+}
+
+export interface UserPreferenceClusterUsage {
+    cluster_id: string;
+    usage_count: number;
+    last_used_at: string;
+}
+
+export interface UserPreferences {
+    user_id: string;
+    preferred_output_format: OutputFormat;
+    preferred_cluster_id: string | null;
+    cluster_usage: UserPreferenceClusterUsage[];
+    query_history: UserQueryHistory[];
+    common_queries: string[];
+    remembered_namespaces: Record<string, string[]>; // cluster_id -> namespaces
+    show_cluster_badges: boolean;
+    auto_include_all_clusters: boolean;
+    query_suggestions_enabled: boolean;
+    last_active_at: string;
+    created_at: string;
+}
+
+// Cross-Cluster Query Result Types
+
+export interface ClusterQueryResult {
+    cluster_id: string;
+    cluster_name: string;
+    namespace?: string;
+    items: Record<string, unknown>[];
+    total_count: number;
+    execution_time_ms: number;
+    status: 'success' | 'error' | 'partial';
+    error_message?: string;
+}
+
+export interface CrossClusterQueryMetadata {
+    query: string;
+    mode: ClusterContextMode;
+    target_clusters: string[];
+    results: ClusterQueryResult[];
+    total_items: number;
+    aggregated_count: number;
+    execution_time_ms: number;
+    namespaces_scoped: boolean;
+}
+
+// Query Request with Context
+export interface QueryRequestWithContext extends QueryRequest {
+    context?: {
+        cluster_context?: ClusterContext;
+        namespace?: string;
+        output_format?: OutputFormat;
+        include_all_clusters?: boolean;
+    };
+}
+
+// Component prop types for context selectors
+
+export interface ClusterContextSelectorProps {
+    clusters: ClusterInfo[];
+    selectedClusterId: string | null;
+    mode: ClusterContextMode;
+    onClusterChange: (clusterId: string | null) => void;
+    onModeChange: (mode: ClusterContextMode) => void;
+    loading?: boolean;
+    disabled?: boolean;
+}
+
+export interface NamespaceSelectorProps {
+    namespaces: NamespaceInfo[];
+    selectedNamespace: string | null;
+    clusterId: string | null;
+    onNamespaceChange: (namespace: string | null) => void;
+    loading?: boolean;
+    disabled?: boolean;
+    showAllOption?: boolean;
+}
+
+export interface UserPreferencesProps {
+    preferences: UserPreferences;
+    onPreferencesChange: (preferences: Partial<UserPreferences>) => void;
+    onClearHistory: () => void;
+    onExportPreferences: () => void;
+    loading?: boolean;
+}
+
+// Helper functions and constants
 
 export interface WorkflowProgressProps {
     workflowExecution: WorkflowExecution;

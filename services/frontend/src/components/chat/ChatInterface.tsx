@@ -1,10 +1,24 @@
-import React, { useState, useRef, useEffect } from 'react';
-import type { Conversation, ConversationMessage, ActionApproval, ApprovalNotification as ApprovalNotificationType, NotificationPreferences } from '@/types/conversation';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
+import type {
+    Conversation,
+    ConversationMessage,
+    ActionApproval,
+    ApprovalNotification as ApprovalNotificationType,
+    NotificationPreferences,
+    WorkflowExecution,
+    WorkflowControlAction,
+} from '@/types/conversation';
 import { conversationsApi } from '@/api/conversations';
 import { ConversationTimeline } from './ConversationTimeline';
 import { IntentIndicator } from './IntentIndicator';
 import { ApprovalModal } from './ApprovalModal';
 import ApprovalNotification from './ApprovalNotification';
+import WorkflowProgress from './WorkflowProgress';
+import { ClusterContextSelector } from './ClusterContextSelector';
+import { NamespaceSelector } from './NamespaceSelector';
+import UserPreferences from './UserPreferences';
+import { useClusterContext } from '@/hooks/useClusterContext';
+import { useUserPreferences } from '@/hooks/useUserPreferences';
 
 interface ChatInterfaceProps {
     userId: string;
@@ -24,7 +38,8 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     const [messages, setMessages] = useState<ConversationMessage[]>([]);
     const [input, setInput] = useState('');
     const [isLoading, setIsLoading] = useState(false);
-    const [isStreaming, setIsStreaming] = useState(false);
+    // isStreaming state kept for future streaming support
+    const [isStreaming] = useState(false);
     const [error, setError] = useState<string | null>(null);
     const [approvalModal, setApprovalModal] = useState<{
         isOpen: boolean;
@@ -40,12 +55,62 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         sound_enabled: false,
     });
 
+    // Workflow execution state
+    const [workflowExecution, setWorkflowExecution] = useState<WorkflowExecution | null>(null);
+    const [expandedStepId, setExpandedStepId] = useState<string | null>(null);
+    const [workflowLoading, setWorkflowLoading] = useState(false);
+
+    // Cluster context state
+    const {
+        clusters,
+        namespaces,
+        context: clusterContext,
+        loading: clusterLoading,
+        error: clusterError,
+        setSelectedCluster,
+        selectCluster,
+        refreshClusters,
+        setMode,
+        setSelectedNamespace,
+        refreshNamespaces,
+        connectedClusters,
+        isAllClustersMode,
+        clusterCounts,
+    } = useClusterContext({ userId });
+
+    // User preferences state
+    const {
+        preferences: userPreferences,
+        loading: preferencesLoading,
+        hasChanges: preferencesHasChanges,
+        updatePreferences,
+        savePreferences,
+        resetPreferences,
+        setOutputFormat,
+        addQueryToHistory,
+        clearQueryHistory,
+        exportPreferences,
+        importPreferences,
+        rememberNamespace,
+        forgetNamespace,
+        getRememberedNamespaces,
+    } = useUserPreferences({ userId });
+
+    // Refs
+    const messagesEndRef = useRef<HTMLDivElement>(null);
+    const inputRef = useRef<HTMLTextAreaElement>(null);
+    const workflowPollingRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Auto-scroll to bottom
+    useEffect(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, [messages]);
+
     // Poll for pending approvals
     useEffect(() => {
         const fetchPendingApprovals = async () => {
             try {
                 const pendingApprovals = await conversationsApi.listPendingApprovals();
-                // Convert approvals to notifications
                 const newNotifications: ApprovalNotificationType[] = pendingApprovals.map((approval) => ({
                     id: `notif_${approval.id}`,
                     approval_id: approval.id,
@@ -58,7 +123,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 }));
                 setNotifications(newNotifications);
 
-                // Play sound if new notifications and sound is enabled
                 if (newNotifications.length > 0 && notificationPreferences.sound_enabled) {
                     // Sound notification would be played here
                 }
@@ -68,67 +132,60 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         };
 
         fetchPendingApprovals();
-        const interval = setInterval(fetchPendingApprovals, 30000); // Poll every 30 seconds
+        const interval = setInterval(fetchPendingApprovals, 30000);
 
         return () => clearInterval(interval);
     }, [notificationPreferences.sound_enabled]);
 
-    // Handlers for notifications
-    const handleMarkAsRead = (notificationId: string): void => {
-        setNotifications((prev) =>
-            prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
-        );
-    };
-
-    const handleApproveAll = async (): Promise<void> => {
-        const pendingNotifications = notifications.filter((n) => !n.read);
-        for (const notif of pendingNotifications) {
+    // Poll for workflow progress
+    const startWorkflowPolling = useCallback((workflowId: string) => {
+        const pollWorkflow = async () => {
             try {
-                await conversationsApi.approveAction({
-                    approval_id: notif.approval_id,
-                    action: 'approve',
-                    reason: 'Bulk approved',
-                });
-            } catch (err) {
-                console.error(`Failed to approve ${notif.approval_id}:`, err);
-            }
-        }
-        setNotifications([]);
-    };
+                // eslint-disable-next-line @typescript-eslint/no-unused-vars
+                const _progress = await conversationsApi.getWorkflowProgress(workflowId);
 
-    const handleViewApproval = (approvalId: string): void => {
-        // Open the approval modal for the specific approval
-        const fetchApproval = async () => {
-            try {
-                const approval = await conversationsApi.getApproval(approvalId);
-                setApprovalModal({ isOpen: true, approval });
+                // Fetch full workflow execution for detailed updates
+                const workflow = await conversationsApi.getWorkflowExecution(workflowId);
+                setWorkflowExecution(workflow);
+
+                // Stop polling if workflow is completed, failed, or cancelled
+                if (['COMPLETED', 'FAILED', 'CANCELLED'].includes(workflow.status)) {
+                    if (workflowPollingRef.current) {
+                        clearInterval(workflowPollingRef.current);
+                        workflowPollingRef.current = null;
+                    }
+
+                    // Add system message about completion
+                    const systemMessage: ConversationMessage = {
+                        id: `msg_${Date.now()}`,
+                        role: 'system',
+                        content: workflow.status === 'COMPLETED'
+                            ? `✅ Workflow "${workflow.name}" completed successfully.`
+                            : `❌ Workflow "${workflow.name}" ${workflow.status.toLowerCase()}.`,
+                        timestamp: new Date().toISOString(),
+                    };
+                    setMessages(prev => [...prev, systemMessage]);
+                }
             } catch (err) {
-                console.error('Failed to fetch approval:', err);
+                console.error('Failed to fetch workflow progress:', err);
             }
         };
-        fetchApproval();
-    };
 
-    const handleTogglePreferences = (): void => {
-        // Toggle notification preferences panel
-        setNotificationPreferences((prev) => ({
-            ...prev,
-            in_app_enabled: !prev.in_app_enabled,
-        }));
-    };
+        pollWorkflow();
+        workflowPollingRef.current = setInterval(pollWorkflow, 3000); // Poll every 3 seconds
+    }, []);
 
-    const pendingCount = notifications.filter((n) => !n.read).length;
-
-    // Refs
-    const messagesEndRef = useRef<HTMLDivElement>(null);
-    const inputRef = useRef<HTMLTextAreaElement>(null);
-
-    // Auto-scroll to bottom
+    // Cleanup polling on unmount
     useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages]);
+        return () => {
+            if (workflowPollingRef.current) {
+                clearInterval(workflowPollingRef.current);
+            }
+        };
+    }, []);
 
     // Initialize conversation
+    // eslint-disable-next-line react-hooks/exhaustive-deps
     useEffect(() => {
         if (initialConversationId) {
             loadConversation(initialConversationId);
@@ -207,9 +264,16 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
 
             setMessages(prev => [...prev, newAssistantMessage]);
 
+            // Check if workflow execution was started
+            if (response.workflow_state === 'EXECUTING' && response.metadata?.workflow_execution_id) {
+                const workflowId = response.metadata.workflow_execution_id as string;
+                const workflow = await conversationsApi.getWorkflowExecution(workflowId);
+                setWorkflowExecution(workflow);
+                startWorkflowPolling(workflowId);
+            }
+
             // Check if approval is needed
             if (response.intent.requires_approval && response.intent.intent === 'ACTION') {
-                // Create approval request
                 const approval = await conversationsApi.createApproval({
                     conversation_id: conversation.id,
                     user_id: userId,
@@ -226,7 +290,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 });
             }
 
-            // Update conversation state
             setConversation(prev => prev ? { ...prev, state: 'COMPLETED' } : null);
         } catch (err) {
             setError(err instanceof Error ? err.message : 'Failed to send message');
@@ -253,7 +316,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 reason,
             });
 
-            // Add system message about approval
             const systemMessage: ConversationMessage = {
                 id: `msg_${Date.now()}`,
                 role: 'system',
@@ -279,7 +341,6 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 reason,
             });
 
-            // Add system message about rejection
             const systemMessage: ConversationMessage = {
                 id: `msg_${Date.now()}`,
                 role: 'system',
@@ -298,7 +359,60 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
     const handleApprovalEscalate = async (): Promise<void> => {
         if (!approvalModal.approval) return;
         console.log('Escalating approval:', approvalModal.approval.id);
-        // This would call an API endpoint to escalate
+    };
+
+    // Workflow control handlers
+    const handleWorkflowControlAction = async (action: WorkflowControlAction, stepId?: string) => {
+        if (!workflowExecution) return;
+
+        // eslint-disable-next-line @typescript-eslint/no-unused-vars
+        const _loading = workflowLoading;
+        setWorkflowLoading(true);
+        try {
+            // eslint-disable-next-line no-case-declarations
+            switch (action) {
+                case 'PAUSE':
+                case 'RESUME':
+                case 'CANCEL': {
+                    const controlledWorkflow = await conversationsApi.controlWorkflow({
+                        workflow_execution_id: workflowExecution.id,
+                        user_id: userId,
+                        action,
+                    });
+                    setWorkflowExecution(controlledWorkflow);
+                    break;
+                }
+                case 'RETRY':
+                    if (stepId) {
+                        const retriedWorkflow = await conversationsApi.retryWorkflowStep(
+                            workflowExecution.id,
+                            stepId,
+                            userId
+                        );
+                        setWorkflowExecution(retriedWorkflow);
+                    }
+                    break;
+                case 'SKIP':
+                    if (stepId) {
+                        const skippedWorkflow = await conversationsApi.skipWorkflowStep(
+                            workflowExecution.id,
+                            stepId,
+                            userId
+                        );
+                        setWorkflowExecution(skippedWorkflow);
+                    }
+                    break;
+            }
+        } catch (err) {
+            setError(`Failed to ${action.toLowerCase()} workflow: ${err instanceof Error ? err.message : 'Unknown error'}`);
+            console.error(err);
+        } finally {
+            setWorkflowLoading(false);
+        }
+    };
+
+    const handleStepClick = (stepId: string | null) => {
+        setExpandedStepId(stepId);
     };
 
     const latestAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant');
@@ -308,28 +422,108 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         <div className="flex flex-col h-full bg-gray-50">
             {/* Header */}
             <div className="bg-white border-b px-4 py-3">
-                <div className="flex items-center justify-between">
-                    <div>
+                <div className="flex items-center justify-between gap-4">
+                    {/* Left side - Title */}
+                    <div className="flex-shrink-0">
                         <h1 className="text-lg font-semibold text-gray-900">AI Assistant</h1>
                         <p className="text-sm text-gray-500">
                             {conversation?.title || 'New Conversation'}
                         </p>
                     </div>
-                    <div className="flex items-center gap-2">
+
+                    {/* Center - Cluster and Namespace selectors */}
+                    <div className="flex items-center gap-2 flex-1 justify-center">
+                        <ClusterContextSelector
+                            clusters={clusters}
+                            selectedClusterId={clusterContext.selected_cluster_id}
+                            mode={clusterContext.mode}
+                            onClusterChange={setSelectedCluster}
+                            onModeChange={setMode}
+                            onRefresh={refreshClusters}
+                            loading={clusterLoading}
+                            counts={clusterCounts}
+                        />
+                        {clusterContext.mode === 'single' && clusterContext.selected_cluster_id && (
+                            <NamespaceSelector
+                                namespaces={namespaces}
+                                selectedNamespace={clusterContext.selected_namespace}
+                                clusterId={clusterContext.selected_cluster_id}
+                                onNamespaceChange={setSelectedNamespace}
+                                rememberedNamespaces={getRememberedNamespaces(clusterContext.selected_cluster_id)}
+                                onRememberNamespace={(ns) => clusterContext.selected_cluster_id && rememberNamespace(clusterContext.selected_cluster_id, ns)}
+                                onForgetNamespace={(ns) => clusterContext.selected_cluster_id && forgetNamespace(clusterContext.selected_cluster_id, ns)}
+                                loading={clusterLoading}
+                            />
+                        )}
+                    </div>
+
+                    {/* Right side - Intent, Preferences, Notifications */}
+                    <div className="flex items-center gap-2 flex-shrink-0">
                         {latestIntent && (
                             <IntentIndicator intent={latestIntent} showDetails />
                         )}
+                        <UserPreferences
+                            preferences={userPreferences}
+                            onPreferencesChange={updatePreferences}
+                            onSave={savePreferences}
+                            onReset={resetPreferences}
+                            onClearHistory={clearQueryHistory}
+                            onExport={exportPreferences}
+                            onImport={importPreferences}
+                            loading={preferencesLoading}
+                            hasChanges={preferencesHasChanges}
+                        />
                         <ApprovalNotification
                             notifications={notifications}
-                            pendingCount={pendingCount}
-                            onMarkAsRead={handleMarkAsRead}
-                            onApproveAll={handleApproveAll}
-                            onViewApproval={handleViewApproval}
-                            onTogglePreferences={handleTogglePreferences}
+                            pendingCount={notifications.filter(n => !n.read).length}
+                            onMarkAsRead={(notificationId) => {
+                                setNotifications(prev =>
+                                    prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
+                                );
+                            }}
+                            onApproveAll={async () => {
+                                const pendingNotifications = notifications.filter(n => !n.read);
+                                for (const notif of pendingNotifications) {
+                                    try {
+                                        await conversationsApi.approveAction({
+                                            approval_id: notif.approval_id,
+                                            action: 'approve',
+                                            reason: 'Bulk approved',
+                                        });
+                                    } catch (err) {
+                                        console.error(`Failed to approve ${notif.approval_id}:`, err);
+                                    }
+                                }
+                                setNotifications([]);
+                            }}
+                            onViewApproval={(approvalId) => {
+                                const fetchApproval = async () => {
+                                    try {
+                                        const approval = await conversationsApi.getApproval(approvalId);
+                                        setApprovalModal({ isOpen: true, approval });
+                                    } catch (err) {
+                                        console.error('Failed to fetch approval:', err);
+                                    }
+                                };
+                                fetchApproval();
+                            }}
+                            onTogglePreferences={() => {
+                                setNotificationPreferences(prev => ({
+                                    ...prev,
+                                    in_app_enabled: !prev.in_app_enabled,
+                                }));
+                            }}
                             preferences={notificationPreferences}
                         />
                     </div>
                 </div>
+
+                {/* Cluster error toast */}
+                {clusterError && (
+                    <div className="mt-2 text-sm text-red-600 bg-red-50 px-3 py-2 rounded-lg">
+                        {clusterError}
+                    </div>
+                )}
             </div>
 
             {/* Messages */}
@@ -339,6 +533,21 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         messages={messages}
                         showTimestamps
                     />
+
+                    {/* Workflow Progress Display */}
+                    {workflowExecution && (
+                        <div className="mt-4">
+                            <WorkflowProgress
+                                workflowExecution={workflowExecution}
+                                expandedStepId={expandedStepId}
+                                onStepClick={handleStepClick}
+                                showControls={true}
+                                onControlAction={handleWorkflowControlAction}
+                                autoScroll={true}
+                            />
+                        </div>
+                    )}
+
                     <div ref={messagesEndRef} />
                 </div>
             </div>

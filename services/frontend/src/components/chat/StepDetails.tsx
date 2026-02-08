@@ -2,9 +2,12 @@ import React, { useState } from 'react';
 import type { WorkflowStep, StepDetailsProps } from '@/types/conversation';
 import { WORKFLOW_STEP_STATUS_CONFIG, formatDuration } from '@/types/conversation';
 
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 const StepDetails: React.FC<StepDetailsProps> = ({
     step,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     isExpanded,
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     onToggleExpand,
     showLogs = true,
     maxLogs = 50,
