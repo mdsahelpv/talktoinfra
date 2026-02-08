@@ -7,9 +7,16 @@ import type {
     ConversationCreateRequest,
     ActionApproval,
     ApprovalActionRequest,
+    CreateAlertRequest,
+    Alert,
+    WorkflowExecution,
+    WorkflowExecutionRequest,
+    WorkflowControlRequest,
+    WorkflowProgressUpdate,
 } from '@/types/conversation';
 
 const AI_ROUTER_URL = import.meta.env.VITE_AI_ROUTER_URL || '';
+const MONITORING_URL = import.meta.env.VITE_MONITORING_URL || AI_ROUTER_URL;
 
 export const conversationsApi = {
     // Conversation CRUD
@@ -93,4 +100,78 @@ export const conversationsApi = {
             confidence: number;
             entities: Array<{ type: string; value: string }>;
         }>(`${AI_ROUTER_URL}/classify`, { query }),
+
+    // Alert management
+    createAlert: (request: CreateAlertRequest) =>
+        apiClient.post<Alert>(`${MONITORING_URL}/alerts`, request),
+
+    listAlerts: (params?: {
+        status?: string;
+        severity?: string;
+        limit?: number;
+        offset?: number;
+    }) => {
+        const queryParams = new URLSearchParams();
+        if (params?.status) queryParams.set('status', params.status);
+        if (params?.severity) queryParams.set('severity', params.severity);
+        if (params?.limit) queryParams.set('limit', String(params.limit));
+        if (params?.offset) queryParams.set('offset', String(params.offset));
+
+        return apiClient.get<Alert[]>(`${MONITORING_URL}/alerts?${queryParams.toString()}`);
+    },
+
+    getAlert: (alertId: string) =>
+        apiClient.get<Alert>(`${MONITORING_URL}/alerts/${alertId}`),
+
+    updateAlert: (alertId: string, data: Partial<CreateAlertRequest>) =>
+        apiClient.post<Alert>(`${MONITORING_URL}/alerts/${alertId}`, data),
+
+    deleteAlert: (alertId: string) =>
+        apiClient.delete(`${MONITORING_URL}/alerts/${alertId}`),
+
+    enableAlert: (alertId: string) =>
+        apiClient.post<Alert>(`${MONITORING_URL}/alerts/${alertId}/enable`),
+
+    disableAlert: (alertId: string) =>
+        apiClient.post<Alert>(`${MONITORING_URL}/alerts/${alertId}/disable`),
+
+    testAlert: (alertId: string) =>
+        apiClient.post<{ success: boolean }>(`${MONITORING_URL}/alerts/${alertId}/test`),
+
+    // Workflow execution API
+    startWorkflow: (request: WorkflowExecutionRequest) =>
+        apiClient.post<WorkflowExecution>(`${AI_ROUTER_URL}/workflows/execute`, request),
+
+    getWorkflowExecution: (workflowExecutionId: string) =>
+        apiClient.get<WorkflowExecution>(`${AI_ROUTER_URL}/workflows/${workflowExecutionId}`),
+
+    getWorkflowsByConversation: (conversationId: string) =>
+        apiClient.get<WorkflowExecution[]>(`${AI_ROUTER_URL}/workflows?conversation_id=${conversationId}`),
+
+    controlWorkflow: (request: WorkflowControlRequest) =>
+        apiClient.post<WorkflowExecution>(`${AI_ROUTER_URL}/workflows/${request.workflow_execution_id}/control`, {
+            action: request.action,
+            step_id: request.step_id,
+            reason: request.reason,
+        }),
+
+    getWorkflowProgress: (workflowExecutionId: string) =>
+        apiClient.get<WorkflowProgressUpdate>(`${AI_ROUTER_URL}/workflows/${workflowExecutionId}/progress`),
+
+    retryWorkflowStep: (workflowExecutionId: string, stepId: string, userId: string) =>
+        apiClient.post<WorkflowExecution>(`${AI_ROUTER_URL}/workflows/${workflowExecutionId}/steps/${stepId}/retry`, {
+            user_id: userId,
+        }),
+
+    skipWorkflowStep: (workflowExecutionId: string, stepId: string, userId: string, reason?: string) =>
+        apiClient.post<WorkflowExecution>(`${AI_ROUTER_URL}/workflows/${workflowExecutionId}/steps/${stepId}/skip`, {
+            user_id: userId,
+            reason,
+        }),
+
+    cancelWorkflow: (workflowExecutionId: string, userId: string, reason?: string) =>
+        apiClient.post<WorkflowExecution>(`${AI_ROUTER_URL}/workflows/${workflowExecutionId}/cancel`, {
+            user_id: userId,
+            reason,
+        }),
 };

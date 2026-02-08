@@ -1,6 +1,8 @@
 import React from 'react';
 import type { ConversationMessage, ConversationState } from '@/types/conversation';
 import { STATE_ICONS } from '@/types/conversation';
+import { SourcesDisplay } from './SourcesDisplay';
+import type { SourceCitation } from '@/types';
 
 interface ConversationTimelineProps {
     messages: ConversationMessage[];
@@ -107,15 +109,12 @@ export const ConversationTimeline: React.FC<ConversationTimelineProps> = ({
                                     )}
                                 </div>
 
-                                {/* Metadata */}
-                                {message.metadata && Object.keys(message.metadata).length > 0 && (
-                                    <div className="mt-2 flex flex-wrap gap-2">
-                                        {message.sources && message.sources.length > 0 && (
-                                            <span className="text-xs text-gray-500">
-                                                📚 {message.sources.length} source(s)
-                                            </span>
-                                        )}
-                                    </div>
+                                {/* Sources */}
+                                {message.sources && message.sources.length > 0 && (
+                                    <SourcesDisplay
+                                        sources={message.sources as SourceCitation[]}
+                                        className="mt-3"
+                                    />
                                 )}
                             </div>
                         </div>

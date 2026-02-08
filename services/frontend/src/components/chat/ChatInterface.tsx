@@ -1,10 +1,10 @@
 import React, { useState, useRef, useEffect } from 'react';
-import type { Conversation, ConversationMessage, IntentClassification, ActionApproval } from '@/types/conversation';
+import type { Conversation, ConversationMessage, ActionApproval, ApprovalNotification as ApprovalNotificationType, NotificationPreferences } from '@/types/conversation';
 import { conversationsApi } from '@/api/conversations';
 import { ConversationTimeline } from './ConversationTimeline';
 import { IntentIndicator } from './IntentIndicator';
 import { ApprovalModal } from './ApprovalModal';
-import { QueryResult } from './QueryResult';
+import ApprovalNotification from './ApprovalNotification';
 
 interface ChatInterfaceProps {
     userId: string;
@@ -30,6 +30,94 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         isOpen: boolean;
         approval: ActionApproval | null;
     }>({ isOpen: false, approval: null });
+
+    // Notification state
+    const [notifications, setNotifications] = useState<ApprovalNotificationType[]>([]);
+    const [notificationPreferences, setNotificationPreferences] = useState<NotificationPreferences>({
+        email_enabled: true,
+        slack_enabled: true,
+        in_app_enabled: true,
+        sound_enabled: false,
+    });
+
+    // Poll for pending approvals
+    useEffect(() => {
+        const fetchPendingApprovals = async () => {
+            try {
+                const pendingApprovals = await conversationsApi.listPendingApprovals();
+                // Convert approvals to notifications
+                const newNotifications: ApprovalNotificationType[] = pendingApprovals.map((approval) => ({
+                    id: `notif_${approval.id}`,
+                    approval_id: approval.id,
+                    conversation_id: approval.conversation_id,
+                    message: `New approval request for ${approval.action_type}`,
+                    action_type: approval.action_type,
+                    risk_level: approval.risk_level,
+                    created_at: approval.created_at,
+                    read: false,
+                }));
+                setNotifications(newNotifications);
+
+                // Play sound if new notifications and sound is enabled
+                if (newNotifications.length > 0 && notificationPreferences.sound_enabled) {
+                    // Sound notification would be played here
+                }
+            } catch (err) {
+                console.error('Failed to fetch pending approvals:', err);
+            }
+        };
+
+        fetchPendingApprovals();
+        const interval = setInterval(fetchPendingApprovals, 30000); // Poll every 30 seconds
+
+        return () => clearInterval(interval);
+    }, [notificationPreferences.sound_enabled]);
+
+    // Handlers for notifications
+    const handleMarkAsRead = (notificationId: string): void => {
+        setNotifications((prev) =>
+            prev.map((n) => (n.id === notificationId ? { ...n, read: true } : n))
+        );
+    };
+
+    const handleApproveAll = async (): Promise<void> => {
+        const pendingNotifications = notifications.filter((n) => !n.read);
+        for (const notif of pendingNotifications) {
+            try {
+                await conversationsApi.approveAction({
+                    approval_id: notif.approval_id,
+                    action: 'approve',
+                    reason: 'Bulk approved',
+                });
+            } catch (err) {
+                console.error(`Failed to approve ${notif.approval_id}:`, err);
+            }
+        }
+        setNotifications([]);
+    };
+
+    const handleViewApproval = (approvalId: string): void => {
+        // Open the approval modal for the specific approval
+        const fetchApproval = async () => {
+            try {
+                const approval = await conversationsApi.getApproval(approvalId);
+                setApprovalModal({ isOpen: true, approval });
+            } catch (err) {
+                console.error('Failed to fetch approval:', err);
+            }
+        };
+        fetchApproval();
+    };
+
+    const handleTogglePreferences = (): void => {
+        // Toggle notification preferences panel
+        setNotificationPreferences((prev) => ({
+            ...prev,
+            in_app_enabled: !prev.in_app_enabled,
+        }));
+    };
+
+    const pendingCount = notifications.filter((n) => !n.read).length;
 
     // Refs
     const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -207,6 +295,12 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
         }
     };
 
+    const handleApprovalEscalate = async (): Promise<void> => {
+        if (!approvalModal.approval) return;
+        console.log('Escalating approval:', approvalModal.approval.id);
+        // This would call an API endpoint to escalate
+    };
+
     const latestAssistantMessage = [...messages].reverse().find(m => m.role === 'assistant');
     const latestIntent = latestAssistantMessage?.intent;
 
@@ -225,6 +319,15 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                         {latestIntent && (
                             <IntentIndicator intent={latestIntent} showDetails />
                         )}
+                        <ApprovalNotification
+                            notifications={notifications}
+                            pendingCount={pendingCount}
+                            onMarkAsRead={handleMarkAsRead}
+                            onApproveAll={handleApproveAll}
+                            onViewApproval={handleViewApproval}
+                            onTogglePreferences={handleTogglePreferences}
+                            preferences={notificationPreferences}
+                        />
                     </div>
                 </div>
             </div>
@@ -299,6 +402,7 @@ export const ChatInterface: React.FC<ChatInterfaceProps> = ({
                 onApprove={handleApprovalApprove}
                 onReject={handleApprovalReject}
                 onClose={() => setApprovalModal({ isOpen: false, approval: null })}
+                onEscalate={handleApprovalEscalate}
             />
         </div>
     );
