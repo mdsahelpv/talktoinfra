@@ -10,6 +10,8 @@ import InfraPage from '@/pages/InfraPage';
 import ActionsPage from '@/pages/ActionsPage';
 import ApprovalsPage from '@/pages/ApprovalsPage';
 import SettingsPage from '@/pages/SettingsPage';
+import WorkflowDashboard from '@/pages/WorkflowDashboard';
+import WorkflowExecutionView from '@/pages/WorkflowExecutionView';
 
 function App() {
   const { isAuthenticated, token, logout } = useAuthStore();
@@ -51,6 +53,9 @@ function App() {
         <Route path="actions" element={<ActionsPage />} />
         <Route path="approvals" element={<ApprovalsPage />} />
         <Route path="settings" element={<SettingsPage />} />
+        <Route path="workflows" element={<WorkflowDashboard />} />
+        <Route path="workflows/:id" element={<WorkflowDashboard />} />
+        <Route path="executions/:executionId" element={<WorkflowExecutionView />} />
       </Route>
     </Routes>
   );

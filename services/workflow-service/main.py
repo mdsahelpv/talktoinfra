@@ -16,11 +16,19 @@ from typing import Dict, List, Any, Optional
 from enum import Enum
 
 import structlog
-from fastapi import FastAPI, HTTPException, BackgroundTasks
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
 from config import get_settings
+from redis_client import get_redis_client, init_redis_client, close_redis_client
+from state_cache import RedisStateCache
+from tasks import (
+    execute_workflow_task,
+    set_storage_refs,
+    workflow_executions,
+    workflow_definitions,
+)
 
 # Configure logging
 structlog.configure(
@@ -45,8 +53,10 @@ logger = structlog.get_logger()
 
 # ============ Enums ============
 
+
 class WorkflowStatus(str, Enum):
     """Workflow execution status."""
+
     DRAFT = "draft"
     ACTIVE = "active"
     PAUSED = "paused"
@@ -59,16 +69,18 @@ class WorkflowStatus(str, Enum):
 
 class StepType(str, Enum):
     """Types of workflow steps."""
-    ACTION = "action"           # Execute an action (K8s deployment, etc.)
-    CONDITION = "condition"     # Conditional branching
-    WAIT = "wait"              # Wait for duration or event
-    APPROVAL = "approval"       # Require approval to proceed
-    PARALLEL = "parallel"       # Execute multiple steps in parallel
+
+    ACTION = "action"  # Execute an action (K8s deployment, etc.)
+    CONDITION = "condition"  # Conditional branching
+    WAIT = "wait"  # Wait for duration or event
+    APPROVAL = "approval"  # Require approval to proceed
+    PARALLEL = "parallel"  # Execute multiple steps in parallel
     NOTIFICATION = "notification"  # Send notification
 
 
 class StepStatus(str, Enum):
     """Step execution status."""
+
     PENDING = "pending"
     RUNNING = "running"
     COMPLETED = "completed"
@@ -79,8 +91,10 @@ class StepStatus(str, Enum):
 
 # ============ Pydantic Models ============
 
+
 class WorkflowStep(BaseModel):
     """A single step in a workflow."""
+
     id: str = Field(default_factory=lambda: f"step_{uuid.uuid4().hex[:8]}")
     name: str
     type: StepType
@@ -112,6 +126,7 @@ class WorkflowStep(BaseModel):
 
 class WorkflowDefinition(BaseModel):
     """Workflow template definition."""
+
     id: str = Field(default_factory=lambda: f"wf_{uuid.uuid4().hex[:8]}")
     name: str
     description: str = ""
@@ -135,6 +150,7 @@ class WorkflowDefinition(BaseModel):
 
 class WorkflowExecution(BaseModel):
     """A running instance of a workflow."""
+
     id: str = Field(default_factory=lambda: f"exec_{uuid.uuid4().hex[:8]}")
     workflow_id: str
     workflow_version: int
@@ -152,8 +168,9 @@ class WorkflowExecution(BaseModel):
     errors: List[str] = []
 
     # Timestamps
-    created_at: str = Field(default_factory=lambda: time.strftime(
-        "%Y-%m-%dT%H:%M:%SZ", time.gmtime()))
+    created_at: str = Field(
+        default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+    )
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
 
@@ -166,15 +183,13 @@ class WorkflowExecution(BaseModel):
 WorkflowStep.model_rebuild()
 
 
-# ============ In-Memory Storage (replace with database) ============
-
-workflow_definitions: Dict[str, WorkflowDefinition] = {}
-workflow_executions: Dict[str, WorkflowExecution] = {}
-
-
 # ============ FastAPI App ============
 
 settings = get_settings()
+
+# Initialize Redis client and state cache
+redis_client = get_redis_client()
+state_cache = RedisStateCache(redis_client, ttl=settings.state_cache_ttl)
 
 app = FastAPI(
     title="Workflow Service",
@@ -195,7 +210,29 @@ app.add_middleware(
 async def lifespan(app: FastAPI):
     """Application lifespan management."""
     logger.info("workflow_service_starting", port=settings.service_port)
+
+    # Initialize Redis client
+    try:
+        redis_client = await init_redis_client(
+            host=settings.redis_host, port=settings.redis_port, db=settings.redis_db
+        )
+        # Test Redis connection
+        redis_client.ping()
+        logger.info(
+            "redis_connection_established",
+            host=settings.redis_host,
+            port=settings.redis_port,
+        )
+    except Exception as e:
+        logger.warning("redis_connection_failed", error=str(e))
+
+    # Set storage references for Celery tasks
+    set_storage_refs(workflow_executions, workflow_definitions)
+
     yield
+
+    # Close Redis connection on shutdown
+    await close_redis_client()
     logger.info("workflow_service_stopping")
 
 
@@ -204,17 +241,26 @@ app.router.lifespan_context = lifespan
 
 # ============ Health Check ============
 
+
 @app.get("/health")
 async def health_check():
     """Health check endpoint."""
+    redis_status = "healthy"
+    try:
+        redis_client.ping()
+    except Exception as e:
+        redis_status = f"unhealthy: {e}"
+
     return {
         "status": "healthy",
         "service": settings.service_name,
         "version": "1.0.0",
+        "redis": redis_status,
     }
 
 
 # ============ Workflow Definition CRUD ============
+
 
 @app.post("/api/v1/workflows")
 async def create_workflow(workflow: WorkflowDefinition) -> Dict[str, Any]:
@@ -244,7 +290,9 @@ async def list_workflows(
         workflows = [w for w in workflows if any(t in w.tags for t in tags)]
 
     return {
-        "items": [w.model_dump(exclude={"steps"}) for w in workflows[skip:skip + limit]],
+        "items": [
+            w.model_dump(exclude={"steps"}) for w in workflows[skip : skip + limit]
+        ],
         "total": len(workflows),
         "skip": skip,
         "limit": limit,
@@ -261,7 +309,9 @@ async def get_workflow(workflow_id: str) -> Dict[str, Any]:
 
 
 @app.put("/api/v1/workflows/{workflow_id}")
-async def update_workflow(workflow_id: str, workflow: WorkflowDefinition) -> Dict[str, Any]:
+async def update_workflow(
+    workflow_id: str, workflow: WorkflowDefinition
+) -> Dict[str, Any]:
     """Update a workflow definition."""
     if workflow_id not in workflow_definitions:
         raise HTTPException(status_code=404, detail="Workflow not found")
@@ -287,13 +337,14 @@ async def delete_workflow(workflow_id: str) -> Dict[str, Any]:
 
 # ============ Workflow Execution ============
 
+
 @app.post("/api/v1/workflows/{workflow_id}/execute")
 async def execute_workflow(
     workflow_id: str,
-    parameters: Dict[str, Any] = None,
-    approved_by: str = None,
+    parameters: Optional[Dict[str, Any]] = None,
+    approved_by: Optional[str] = None,
 ) -> Dict[str, Any]:
-    """Start a workflow execution."""
+    """Start a workflow execution synchronously."""
     if workflow_id not in workflow_definitions:
         raise HTTPException(status_code=404, detail="Workflow not found")
 
@@ -326,6 +377,178 @@ async def execute_workflow(
     }
 
 
+@app.post("/api/v1/workflows/{workflow_id}/execute-async")
+async def execute_workflow_async(
+    workflow_id: str,
+    parameters: Optional[Dict[str, Any]] = None,
+    approved_by: Optional[str] = None,
+) -> Dict[str, Any]:
+    """Start a workflow execution asynchronously using Celery.
+
+    This endpoint triggers an async workflow execution and returns
+    immediately with the execution ID and task ID for tracking.
+    """
+    if workflow_id not in workflow_definitions:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    workflow = workflow_definitions[workflow_id]
+
+    # Create execution instance
+    execution = WorkflowExecution(
+        workflow_id=workflow_id,
+        workflow_version=workflow.version,
+        parameters=parameters or {},
+        created_by=workflow.created_by,
+        approved_by=approved_by,
+    )
+
+    # Add to execution store
+    workflow_executions[execution.id] = execution
+
+    # Cache initial state in Redis
+    initial_state = {
+        "execution_id": execution.id,
+        "workflow_id": execution.workflow_id,
+        "status": execution.status.value,
+        "current_step_id": execution.current_step_id,
+        "parameters": execution.parameters,
+        "results": {},
+        "errors": [],
+        "steps": [
+            {
+                "id": step.id,
+                "name": step.name,
+                "status": step.status.value,
+                "order": step.order,
+            }
+            for step in workflow.steps
+        ],
+        "total_steps": len(workflow.steps),
+        "completed_steps": 0,
+        "progress_percent": 0,
+        "created_at": execution.created_at,
+        "started_at": execution.started_at,
+        "completed_at": None,
+    }
+    await state_cache.set_execution_state(workflow_id, execution.id, initial_state)
+
+    logger.info(
+        "workflow_async_execution_started",
+        execution_id=execution.id,
+        workflow_id=workflow_id,
+    )
+
+    # Trigger async Celery task
+    task = execute_workflow_task.delay(workflow_id, execution.id)
+
+    return {
+        "execution_id": execution.id,
+        "task_id": task.id,
+        "status": execution.status,
+        "created_at": execution.created_at,
+        "message": "Workflow execution started asynchronously",
+    }
+
+
+@app.get("/api/v1/workflows/{workflow_id}/executions/{execution_id}/status")
+async def get_execution_status(
+    workflow_id: str,
+    execution_id: str,
+) -> Dict[str, Any]:
+    """Get the status of a workflow execution.
+
+    Returns the current execution state including:
+    - Status (running, completed, failed, etc.)
+    - Current step
+    - Results so far
+    - Errors (if any)
+    """
+    if workflow_id not in workflow_definitions:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
+    # Try to get from Redis cache first
+    cached_state = await state_cache.get_execution_state(workflow_id, execution_id)
+    if cached_state:
+        logger.debug("execution_state_from_cache", execution_id=execution_id)
+        return cached_state
+
+    # Fall back to in-memory storage
+    if execution_id not in workflow_executions:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    execution = workflow_executions[execution_id]
+
+    return {
+        "execution_id": execution.id,
+        "workflow_id": execution.workflow_id,
+        "status": execution.status,
+        "current_step_id": execution.current_step_id,
+        "parameters": execution.parameters,
+        "results": execution.results,
+        "errors": execution.errors,
+        "created_at": execution.created_at,
+        "started_at": execution.started_at,
+        "completed_at": execution.completed_at,
+    }
+
+    # Check if execution belongs to the workflow
+    if execution.workflow_id != workflow_id:
+        raise HTTPException(
+            status_code=400,
+            detail="Execution does not belong to the specified workflow",
+        )
+
+    return {
+        "execution_id": execution.id,
+        "workflow_id": execution.workflow_id,
+        "status": execution.status,
+        "current_step_id": execution.current_step_id,
+        "parameters": execution.parameters,
+        "results": execution.results,
+        "errors": execution.errors,
+        "created_at": execution.created_at,
+        "started_at": execution.started_at,
+        "completed_at": execution.completed_at,
+    }
+
+
+@app.get("/api/v1/executions/{execution_id}/task-status")
+async def get_task_status(execution_id: str) -> Dict[str, Any]:
+    """Get the Celery task status for an execution.
+
+    Returns the Celery task status including:
+    - Task state (PENDING, STARTED, SUCCESS, FAILURE, etc.)
+    - Task result (if completed)
+    - Task traceback (if failed)
+    """
+    # Find the task ID for this execution
+    # In a production system, you'd store the task_id with the execution
+    # For now, we need to find it from the execution's context
+    task_id = None
+
+    for key, value in workflow_executions.items():
+        if key == execution_id:
+            # Check if we stored a task_id
+            task_id = getattr(value, "celery_task_id", None)
+            break
+
+    if task_id is None:
+        raise HTTPException(
+            status_code=404, detail="No Celery task found for this execution"
+        )
+
+    # Get task status from Celery
+    from tasks import get_task_status as celery_get_status
+
+    status_result = celery_get_status.delay(task_id)
+
+    return {
+        "execution_id": execution_id,
+        "task_id": task_id,
+        "celery_status": status_result.status,
+    }
+
+
 @app.get("/api/v1/executions")
 async def list_executions(
     workflow_id: Optional[str] = None,
@@ -343,7 +566,7 @@ async def list_executions(
         executions = [e for e in executions if e.status.value == status]
 
     return {
-        "items": [e.model_dump() for e in executions[skip:skip + limit]],
+        "items": [e.model_dump() for e in executions[skip : skip + limit]],
         "total": len(executions),
         "skip": skip,
         "limit": limit,
@@ -370,7 +593,7 @@ async def cancel_execution(execution_id: str) -> Dict[str, Any]:
     if execution.status not in [WorkflowStatus.RUNNING, WorkflowStatus.PAUSED]:
         raise HTTPException(
             status_code=400,
-            detail=f"Cannot cancel execution in {execution.status.value} status"
+            detail=f"Cannot cancel execution in {execution.status.value} status",
         )
 
     execution.status = WorkflowStatus.CANCELLED
@@ -393,14 +616,12 @@ async def rollback_execution(execution_id: str) -> Dict[str, Any]:
 
     if execution.status not in [WorkflowStatus.COMPLETED, WorkflowStatus.FAILED]:
         raise HTTPException(
-            status_code=400,
-            detail=f"Can only rollback completed or failed executions"
+            status_code=400, detail="Can only rollback completed or failed executions"
         )
 
     execution.status = WorkflowStatus.ROLLING_BACK
 
-    logger.info("workflow_execution_rollback_started",
-                execution_id=execution_id)
+    logger.info("workflow_execution_rollback_started", execution_id=execution_id)
     return {
         "execution_id": execution_id,
         "status": WorkflowStatus.ROLLING_BACK.value,
@@ -431,8 +652,7 @@ TEMPLATE_KUBERNETES_DEPLOYMENT = WorkflowDefinition(
             name="Update Kubernetes",
             type=StepType.ACTION,
             order=2,
-            config={"action": "kubectl_apply",
-                    "manifest": "k8s/deployment.yaml"},
+            config={"action": "kubectl_apply", "manifest": "k8s/deployment.yaml"},
         ),
         WorkflowStep(
             name="Wait for Rollout",
@@ -529,10 +749,15 @@ TEMPLATE_DATABASE_MIGRATION = WorkflowDefinition(
 
 
 # Register default templates
-for template in [TEMPLATE_KUBERNETES_DEPLOYMENT, TEMPLATE_BLUE_GREEN, TEMPLATE_DATABASE_MIGRATION]:
+for template in [
+    TEMPLATE_KUBERNETES_DEPLOYMENT,
+    TEMPLATE_BLUE_GREEN,
+    TEMPLATE_DATABASE_MIGRATION,
+]:
     workflow_definitions[template.id] = template
 
 
 if __name__ == "__main__":
     import uvicorn
+
     uvicorn.run(app, host="0.0.0.0", port=settings.service_port)

@@ -26,6 +26,20 @@ export {
   SOURCE_LABELS,
 } from './citations';
 
+// Workflow Types
+export type {
+  WorkflowStatus,
+  ExecutionStatus,
+  StepType,
+  WorkflowStep,
+  Workflow,
+  WorkflowExecution,
+  WorkflowStepExecution,
+  WorkflowTemplate,
+  WorkflowListResponse,
+  ExecutionListResponse,
+} from './workflow';
+
 export interface User {
   id: string;
   username: string;

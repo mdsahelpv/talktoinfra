@@ -3,9 +3,15 @@ Workflow Service Database Models
 """
 
 import datetime
-from typing import List, Optional
 from sqlalchemy import (
-    Column, Integer, String, Boolean, Text, DateTime, JSON, ForeignKey
+    Column,
+    Integer,
+    String,
+    Boolean,
+    Text,
+    DateTime,
+    JSON,
+    ForeignKey,
 )
 from sqlalchemy.orm import relationship
 
@@ -14,6 +20,7 @@ from database import Base
 
 class WorkflowDefinition(Base):
     """Workflow template definition in database."""
+
     __tablename__ = "workflow_definitions"
 
     id = Column(String, primary_key=True, index=True)
@@ -38,8 +45,9 @@ class WorkflowDefinition(Base):
 
     # Timestamps
     created_at = Column(DateTime, default=datetime.datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.datetime.utcnow,
-                        onupdate=datetime.datetime.utcnow)
+    updated_at = Column(
+        DateTime, default=datetime.datetime.utcnow, onupdate=datetime.datetime.utcnow
+    )
 
     # Relationships
     executions = relationship("WorkflowExecution", back_populates="workflow")
@@ -47,6 +55,7 @@ class WorkflowDefinition(Base):
 
 class WorkflowExecution(Base):
     """Workflow execution instance in database."""
+
     __tablename__ = "workflow_executions"
 
     id = Column(String, primary_key=True, index=True)
@@ -81,6 +90,7 @@ class WorkflowExecution(Base):
 
 class StepExecution(Base):
     """Execution details for individual workflow steps."""
+
     __tablename__ = "step_executions"
 
     id = Column(String, primary_key=True, index=True)
@@ -105,5 +115,4 @@ class StepExecution(Base):
     retry_count = Column(Integer, default=0)
 
     # Relationships
-    execution = relationship(
-        "WorkflowExecution", back_populates="step_executions")
+    execution = relationship("WorkflowExecution", back_populates="step_executions")
