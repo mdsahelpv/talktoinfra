@@ -13,7 +13,7 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from api.v1 import index, search, sources
+from api.v1 import index, search, sources, hierarchical, knowledge_graph, data_quality, performance
 from config import get_settings
 
 # Configure structured logging
@@ -115,6 +115,10 @@ async def global_exception_handler(request: Request, exc: Exception):
 app.include_router(index.router, prefix="/api/v1/rag")
 app.include_router(search.router, prefix="/api/v1/rag")
 app.include_router(sources.router, prefix="/api/v1/rag")
+app.include_router(hierarchical.router, prefix="/api/v1/rag")
+app.include_router(knowledge_graph.router, prefix="/api/v1/rag")
+app.include_router(data_quality.router, prefix="/api/v1/rag")
+app.include_router(performance.router, prefix="/api/v1/rag")
 
 
 # Health check endpoint

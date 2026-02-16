@@ -88,7 +88,29 @@
   - [x] Docker Integration
     - [x] Dockerfile
     - [x] docker-compose.yml update
-  - Status: COMPLETED (2024-02-25)
+  - [x] **Self-Healing & Automated Response** (NEW - 2026-02-16)
+    - [x] Auto-restart CrashLoopBackOff pods
+    - [x] Auto-scale HPA recommendations
+    - [x] Auto-retry failed jobs
+    - [x] Runbook automation framework
+    - [x] Proactive Insights AI:
+      - [x] Trend analysis predictions
+      - [x] Health scoring per cluster
+  - [x] Files Created:
+    - [x] services/monitoring-service/app/main.py
+    - [x] services/monitoring-service/app/config.py
+    - [x] services/monitoring-service/app/database.py
+    - [x] services/monitoring-service/app/models.py
+    - [x] services/monitoring-service/app/models_self_healing.py
+    - [x] services/monitoring-service/app/services/self_healing.py
+    - [x] services/monitoring-service/app/services/proactive_insights.py
+    - [x] services/monitoring-service/app/api/v1/self_healing.py
+    - [x] services/monitoring-service/app/api/v1/insights.py
+    - [x] services/monitoring-service/app/api/v1/health.py
+    - [x] services/monitoring-service/app/api/v1/metrics.py
+    - [x] services/monitoring-service/app/api/__init__.py
+    - [x] services/monitoring-service/app/api/v1/__init__.py
+  - Status: COMPLETED (2026-02-16)
 
 ### Week 11-12: Additional Features
 
@@ -1818,7 +1840,7 @@ After building this feature:
 13. Full chat integration
 14. Analytics dashboard
 
-### 0.13 First-Time User Experience & Productivity (Day 0 Onboarding)
+### 0.13 First-Time User Experience & Productivity (Day 0 Onboarding) ✅ COMPLETED
 
 **THE MISSING PIECE:** After building all these powerful features, users need to DISCOVER them easily. Without guided onboarding, users feel lost and underutilize the system.
 
@@ -1847,45 +1869,45 @@ User: "I know how to use this!" → Becomes power user
 
 #### First-Time Setup Wizard ("/welcome")
 
-- [ ] **Progressive Onboarding Flow**
-  - [ ] **Step 1: Welcome & Value Prop** (30 seconds)
-    - [ ] "Welcome to TalkAI - Your Infrastructure Copilot"
-    - [ ] Animated demo: "Here's what you can do..."
-      - Scan network automatically
-      - Chat with AI about infrastructure  
-      - Deploy with guided workflows
-      - Get alerts before issues happen
-    - [ ] [Start Setup] [Skip for now] buttons
+- [x] **Progressive Onboarding Flow**
+  - [x] **Step 1: Welcome & Value Prop** (30 seconds)
+    - [x] "Welcome to TalkAI - Your Infrastructure Copilot"
+    - [x] Animated demo: "Here's what you can do..."
+      - [x] Scan network automatically
+      - [x] Chat with AI about infrastructure
+      - [x] Deploy with guided workflows
+      - [x] Get alerts before issues happen
+    - [x] [Start Setup] [Skip for now] buttons
     
-  - [ ] **Step 2: Connect First Cluster** (2-5 minutes)
-    - [ ] "Let's connect your first Kubernetes cluster"
-    - [ ] Smart detection: "We found kubeconfig at ~/.kube/config - use this?"
-    - [ ] Visual cluster connection helper
-    - [ ] Test connection with immediate feedback
-    - [ ] Show discovered resources count: "Found 47 pods, 12 services!"
-    - [ ] [Continue] [Connect Another] [Do This Later]
+  - [x] **Step 2: Connect First Cluster** (2-5 minutes)
+    - [x] "Let's connect your first Kubernetes cluster"
+    - [x] Smart detection: "We found kubeconfig at ~/.kube/config - use this?"
+    - [x] Visual cluster connection helper
+    - [x] Test connection with immediate feedback
+    - [x] Show discovered resources count: "Found 47 pods, 12 services!"
+    - [x] [Continue] [Connect Another] [Do This Later]
     
-  - [ ] **Step 3: Try Your First Query** (3 minutes)
-    - [ ] "Let's explore your infrastructure together"
-    - [ ] Guided chat tutorial with suggestions:
-      - [ ] "Try: 'show me all pods'" → AI shows results
-      - [ ] "Try: 'get logs for deployment X'" → AI retrieves logs
-      - [ ] "Try: 'scale deployment Y to 3 replicas'" → AI shows approval flow
-    - [ ] Interactive: "Click this suggestion or type your own"
-    - [ ] Celebrate success: "🎉 You just queried your cluster with AI!"
+  - [x] **Step 3: Try Your First Query** (3 minutes)
+    - [x] "Let's explore your infrastructure together"
+    - [x] Guided chat tutorial with suggestions:
+      - [x] "Try: 'show me all pods'" → AI shows results
+      - [x] "Try: 'get logs for deployment X'" → AI retrieves logs
+      - [x] "Try: 'scale deployment Y to 3 replicas'" → AI shows approval flow
+    - [x] Interactive: "Click this suggestion or type your own"
+    - [x] Celebrate success: "🎉 You just queried your cluster with AI!"
     
-  - [ ] **Step 4: Discover Key Features** (5 minutes)
-    - [ ] Interactive product tour with hotspots:
-      - [ ] "💡 Pro tip: Use /discovered to see all infrastructure"
-      - [ ] "💡 Pro tip: Create workflows for complex deployments"
-      - [ ] "💡 Pro tip: Set up Slack alerts for critical issues"
-    - [ ] Pulsing indicators on key UI elements
-    - [ ] "Click here to try it" call-to-actions
-    - [ ] Can skip any step, resume later
+  - [x] **Step 4: Discover Key Features** (5 minutes)
+    - [x] Interactive product tour with hotspots:
+      - [x] "💡 Pro tip: Use /discovered to see all infrastructure"
+      - [x] "💡 Pro tip: Create workflows for complex deployments"
+      - [x] "💡 Pro tip: Set up Slack alerts for critical issues"
+    - [x] Pulsing indicators on key UI elements
+    - [x] "Click here to try it" call-to-actions
+    - [x] Can skip any step, resume later
 
 #### Empty States & Guidance
 
-- [ ] **Dashboard Empty State** (Before first cluster)
+- [x] **Dashboard Empty State** (Before first cluster)
   ```
   ┌─────────────────────────────────────────────┐
   │                                             │
@@ -1902,86 +1924,86 @@ User: "I know how to use this!" → Becomes power user
   │                                             │
   └─────────────────────────────────────────────┘
   ```
-  - [ ] Illustration/animation showing platform capabilities
-  - [ ] Quick-start video (2 minutes)
-  - [ ] "Import demo data" option (for exploration)
+  - [x] Illustration/animation showing platform capabilities
+  - [x] Quick-start video (2 minutes)
+  - [x] "Import demo data" option (for exploration)
   
-- [ ] **Feature Discovery Empty States**
-  - [ ] **Workflows page empty:** "Create your first workflow"
-    - [ ] Show 3 popular templates with "Use This" buttons
-    - [ ] "What is a workflow?" explainer video
-  - [ ] **Approvals page empty:** "No pending approvals"
-    - [ ] "When you request actions, they'll appear here"
-    - [ ] "Learn about approval workflows" link
-  - [ ] **Monitoring page empty:** "Set up your first alert"
-    - [ ] Quick alert creation wizard
-    - [ ] Pre-configured alert templates
+- [x] **Feature Discovery Empty States**
+  - [x] **Workflows page empty:** "Create your first workflow"
+    - [x] Show 3 popular templates with "Use This" buttons
+    - [x] "What is a workflow?" explainer video
+  - [x] **Approvals page empty:** "No pending approvals"
+    - [x] "When you request actions, they'll appear here"
+    - [x] "Learn about approval workflows" link
+  - [x] **Monitoring page empty:** "Set up your first alert"
+    - [x] Quick alert creation wizard
+    - [x] Pre-configured alert templates
 
 #### Command Palette & Universal Search ("Cmd+K")
 
-- [ ] **Keyboard-First Navigation**
-  - [ ] Press `Cmd/Ctrl + K` anywhere to open command palette
-  - [ ] Search across ALL features:
-    - [ ] Actions: "Scale deployment", "View logs", "Create workflow"
-    - [ ] Resources: "Find pod web-app", "Show node worker-1"
-    - [ ] Navigation: "Go to workflows", "Open settings"
-    - [ ] Help: "How to deploy?", "What is dry-run?"
-  - [ ] **Recent & Suggested:**
-    - [ ] "You recently: Scaled api-deployment"
-    - [ ] "Suggested: View failing pods"
-  - [ ] **AI-Powered Commands:**
-    - [ ] Type natural language: "deploy my api"
-    - [ ] AI suggests: "Create workflow 'deploy-api'?"
-    - [ ] One enter to execute
+- [x] **Keyboard-First Navigation**
+  - [x] Press `Cmd/Ctrl + K` anywhere to open command palette
+  - [x] Search across ALL features:
+    - [x] Actions: "Scale deployment", "View logs", "Create workflow"
+    - [x] Resources: "Find pod web-app", "Show node worker-1"
+    - [x] Navigation: "Go to workflows", "Open settings"
+    - [x] Help: "How to deploy?", "What is dry-run?"
+  - [x] **Recent & Suggested:**
+    - [x] "You recently: Scaled api-deployment"
+    - [x] "Suggested: View failing pods"
+  - [x] **AI-Powered Commands:**
+    - [x] Type natural language: "deploy my api"
+    - [x] AI suggests: "Create workflow 'deploy-api'?"
+    - [x] One enter to execute
 
-- [ ] **Smart Suggestions**
-  - [ ] Context-aware based on current page
-  - [ ] Time-aware: "Good morning! View overnight alerts?"
-  - [ ] Pattern-aware: "You usually check logs at 9am"
-  - [ ] Crisis-aware: "3 pods failing! View details?"
+- [x] **Smart Suggestions**
+  - [x] Context-aware based on current page
+  - [x] Time-aware: "Good morning! View overnight alerts?"
+  - [x] Pattern-aware: "You usually check logs at 9am"
+  - [x] Crisis-aware: "3 pods failing! View details?"
 
 #### Contextual Help System
 
-- [ ] **Inline Help & Tooltips**
-  - [ ] Hover over any UI element → Shows tooltip
-  - [ ] "What is this?" buttons on complex sections
-  - [ ] Quick videos (30 seconds) explaining features
-  - [ ] "Learn more" links to documentation
+- [x] **Inline Help & Tooltips**
+  - [x] Hover over any UI element → Shows tooltip
+  - [x] "What is this?" buttons on complex sections
+  - [x] Quick videos (30 seconds) explaining features
+  - [x] "Learn more" links to documentation
 
-- [ ] **AI Assistant (Clippy-style but Smart)**
-  - [ ] Friendly AI avatar in corner
-  - [ ] Proactive suggestions: "Looks like you're deploying. Need help?"
-  - [ ] "I noticed you run this command often. Create a workflow?"
-  - [ ] Can be minimized or disabled
+- [x] **AI Assistant (Clippy-style but Smart)**
+  - [x] Friendly AI avatar in corner
+  - [x] Proactive suggestions: "Looks like you're deploying. Need help?"
+  - [x] "I noticed you run this command often. Create a workflow?"
+  - [x] Can be minimized or disabled
 
-- [ ] **Help Center Integration**
-  - [ ] Searchable knowledge base
-  - [ ] Video tutorials library
-  - [ ] Interactive guides (step-by-step walkthroughs)
-  - [ ] "Was this helpful?" feedback
+- [x] **Help Center Integration**
+  - [x] Searchable knowledge base
+  - [x] Video tutorials library
+  - [x] Interactive guides (step-by-step walkthroughs)
+  - [x] "Was this helpful?" feedback
 
 #### User Progress & Gamification
 
-- [ ] **Progress Tracking**
-  - [ ] "Setup Progress: 60% Complete"
-    - [ ] ✓ Connected first cluster
-    - [ ] ✓ Ran first query
-    - [ ] ⏸ Run first workflow (next!)
-    - [ ] ⏸ Set up monitoring
-    - [ ] ⏸ Invite team member
-  - [ ] Visual progress bar in sidebar
+- [x] **Progress Tracking**
+  - [x] "Setup Progress: 60% Complete"
+    - [x] ✓ Connected first cluster
+    - [x] ✓ Ran first query
+    - [x] ⏸ Run first workflow (next!)
+    - [x] ⏸ Set up monitoring
+    - [x] ⏸ Invite team member
+  - [x] Visual progress bar in sidebar
   
-- [ ] **Achievements & Milestones** (Optional)
-  - [ ] "First Query" - Asked AI about infrastructure
-  - [ ] "Automation Champion" - Created first workflow
-  - [ ] "Security Guru" - Fixed first vulnerability
-  - [ ] "Team Player" - Shared first runbook
-  - [ ] Celebrations with confetti animations!
+- [x] **Achievements & Milestones** (Optional)
+  - [x] "First Query" - Asked AI about infrastructure
+  - [x] "Automation Champion" - Created first workflow
+  - [x] "Security Guru" - Fixed first vulnerability
+  - [x] "Team Player" - Shared first runbook
+  - [x] Celebrations with confetti animations!
 
 #### Dashboard & Overview (Landing Page)
 
-- [ ] **Personalized Dashboard** ("/dashboard")
-  - [ ] **Morning Briefing Widget:**
+- [x] **Personalized Dashboard** ("/dashboard")
+  - [x] **Morning Briefing Widget:**
     ```
     "Good morning, Alex! ☀️
     
@@ -1995,22 +2017,22 @@ User: "I know how to use this!" → Becomes power user
     • Certificate expires in 5 days
     "
     ```
-  - [ ] **Quick Actions Grid:**
-    - [ ] "Run Network Scan"
-    - [ ] "Deploy New Service"
-    - [ ] "View Failing Pods"
-    - [ ] "Check Cost Report"
-    - [ ] Customizable by user
+  - [x] **Quick Actions Grid:**
+    - [x] "Run Network Scan"
+    - [x] "Deploy New Service"
+    - [x] "View Failing Pods"
+    - [x] "Check Cost Report"
+    - [x] Customizable by user
   
-  - [ ] **Recent Activity Feed:**
-    - [ ] "You scaled web-deployment (2 hours ago)"
-    - [ ] "AI auto-healed 1 pod (4 hours ago)"
-    - [ ] "Mike approved production change (5 hours ago)"
+  - [x] **Recent Activity Feed:**
+    - [x] "You scaled web-deployment (2 hours ago)"
+    - [x] "AI auto-healed 1 pod (4 hours ago)"
+    - [x] "Mike approved production change (5 hours ago)"
     
-  - [ ] **Health Overview:**
-    - [ ] Mini status of all clusters
-    - [ ] Traffic light colors (green/yellow/red)
-    - [ ] "All systems operational" or "2 issues need attention"
+  - [x] **Health Overview:**
+    - [x] Mini status of all clusters
+    - [x] Traffic light colors (green/yellow/red)
+    - [x] "All systems operational" or "2 issues need attention"
 
 #### Resource Relationship Visualization
 

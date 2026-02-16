@@ -85,6 +85,22 @@ class Settings(BaseSettings):
         description="Maximum context length for RAG prompts",
     )
 
+    # Data quality configuration
+    rag_freshness_thresholds: Dict[str, int] = Field(
+        default={
+            "critical": 1,    # 1 hour for critical resources
+            "high": 4,        # 4 hours for important resources
+            "medium": 24,     # 24 hours for normal resources
+            "low": 72,        # 72 hours for low priority resources
+            "stale": 168,     # 1 week - mark as stale
+        },
+        description="Freshness thresholds in hours by priority",
+    )
+    rag_confidence_threshold: float = Field(
+        default=0.5,
+        description="Minimum confidence threshold for results",
+    )
+
     # Collection names for different document types
     collection_infrastructure: str = Field(
         default="infrastructure-resources",

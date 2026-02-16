@@ -4,6 +4,7 @@ import { useAuthStore } from '@/stores';
 import { apiClient } from '@/api/client';
 import Layout from '@/components/layout/Layout';
 import LoginPage from '@/pages/LoginPage';
+import WelcomePage from '@/pages/WelcomePage';
 import ChatPage from '@/pages/ChatPage';
 import DashboardPage from '@/pages/DashboardPage';
 import InfraPage from '@/pages/InfraPage';
@@ -41,6 +42,10 @@ function App() {
       <Route
         path="/login"
         element={isAuthenticated ? <Navigate to="/" /> : <LoginPage />}
+      />
+      <Route
+        path="/welcome"
+        element={isAuthenticated ? <WelcomePage /> : <Navigate to="/login" />}
       />
       <Route
         path="/"

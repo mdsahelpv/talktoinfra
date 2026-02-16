@@ -214,6 +214,12 @@ class Settings(BaseModel):
         description="Kubernetes cluster configurations"
     )
 
+    # Action Engine URL for self-healing
+    action_engine_url: str = Field(
+        default="http://localhost:8010",
+        description="Action Engine service URL for executing fixes"
+    )
+
     class Config:
         env_file = ".env"
         env_nested_delimiter = "__"

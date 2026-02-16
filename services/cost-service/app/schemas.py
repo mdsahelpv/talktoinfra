@@ -439,3 +439,267 @@ class HealthCheckResponse(BaseModel):
     cache_status: str
     collector_status: Dict[str, str]
     timestamp: datetime
+
+
+# ============ Cost Tag Schemas ============
+
+class CostTagBase(BaseModel):
+    """Base schema for cost tags."""
+
+    cloud_provider: CloudProvider
+    cluster_id: Optional[str] = None
+    account_id: Optional[str] = None
+    team: Optional[str] = None
+    project: Optional[str] = None
+    environment: Optional[str] = None
+    service: Optional[str] = None
+    namespace: Optional[str] = None
+    resource_id: Optional[str] = None
+    resource_type: Optional[str] = None
+    custom_tags: Optional[Dict[str, str]] = None
+
+
+class CostTagCreate(CostTagBase):
+    """Schema for creating a cost tag."""
+
+    period_start: datetime
+    period_end: datetime
+
+
+class CostTagResponse(CostTagBase):
+    """Schema for cost tag response."""
+
+    id: str
+    cost_amount: Decimal
+    period_start: datetime
+    period_end: datetime
+    created_at: datetime
+    updated_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class CostTagAggregation(BaseModel):
+    """Aggregated cost by tag dimension."""
+
+    team: Optional[str] = None
+    project: Optional[str] = None
+    environment: Optional[str] = None
+    service: Optional[str] = None
+    namespace: Optional[str] = None
+    total_cost: Decimal
+    resource_count: int = 0
+    percentage: float = 0.0
+
+
+# ============ Cost Anomaly Schemas ============
+
+class AnomalyType(str, Enum):
+    """Types of cost anomalies."""
+
+    SPENDING_SPIKE = "spending_spike"
+    NEW_EXPENSIVE_RESOURCE = "new_expensive_resource"
+    IDLE_RESOURCE = "idle_resource"
+    DATA_TRANSFER_SPIKE = "data_transfer_spike"
+    UNUSED_VOLUME = "unused_volume"
+    PRICE_CHANGE = "price_change"
+    ANOMALY_DETECTED = "anomaly_detected"
+
+
+class AnomalySeverity(str, Enum):
+    """Severity levels for anomalies."""
+
+    INFO = "info"
+    WARNING = "warning"
+    CRITICAL = "critical"
+
+
+class AnomalyStatus(str, Enum):
+    """Status of anomaly."""
+
+    ACTIVE = "active"
+    INVESTIGATED = "investigated"
+    ACKNOWLEDGED = "acknowledged"
+    RESOLVED = "resolved"
+    DISMISSED = "dismissed"
+
+
+class CostAnomalyBase(BaseModel):
+    """Base schema for cost anomalies."""
+
+    cloud_provider: CloudProvider
+    cluster_id: Optional[str] = None
+    anomaly_type: AnomalyType
+    severity: AnomalySeverity = AnomalySeverity.WARNING
+    title: str
+    description: str
+    baseline_value: Optional[Decimal] = None
+    current_value: Optional[Decimal] = None
+    expected_value: Optional[Decimal] = None
+    change_percent: Optional[float] = None
+    resource_id: Optional[str] = None
+    resource_name: Optional[str] = None
+    resource_type: Optional[str] = None
+    service_name: Optional[str] = None
+    cost_impact: Optional[Decimal] = None
+    currency: str = "USD"
+    detection_method: Optional[str] = None
+    confidence_score: Optional[float] = None
+
+
+class CostAnomalyCreate(CostAnomalyBase):
+    """Schema for creating an anomaly."""
+
+    metadata: Optional[Dict[str, Any]] = None
+
+
+class CostAnomalyResponse(CostAnomalyBase):
+    """Schema for anomaly response."""
+
+    id: str
+    status: AnomalyStatus
+    detected_at: datetime
+    acknowledged_at: Optional[datetime] = None
+    resolved_at: Optional[datetime] = None
+    created_at: datetime
+    updated_at: datetime
+    metadata: Optional[Dict[str, Any]] = None
+
+    class Config:
+        from_attributes = True
+
+
+class AnomalyDetectionRequest(BaseModel):
+    """Request schema for anomaly detection."""
+
+    start_date: datetime
+    end_date: datetime
+    cloud_provider: Optional[CloudProvider] = None
+    cluster_id: Optional[str] = None
+    sensitivity: float = Field(
+        default=2.0, ge=1.0, le=4.0)  # Z-score threshold
+
+
+class AnomalyDetectionResult(BaseModel):
+    """Result of anomaly detection run."""
+
+    anomalies_detected: int
+    critical_count: int
+    warning_count: int
+    info_count: int
+    total_cost_impact: Decimal
+    detection_run_time: datetime
+
+
+# ============ Chargeback Report Schemas ============
+
+class ChargebackReportBase(BaseModel):
+    """Base schema for chargeback reports."""
+
+    team: str
+    project: Optional[str] = None
+    environment: Optional[str] = None
+    cloud_provider: Optional[CloudProvider] = None
+    period_start: datetime
+    period_end: datetime
+
+
+class ChargebackReportCreate(ChargebackReportBase):
+    """Schema for generating chargeback report."""
+
+    pass
+
+
+class ChargebackReportResponse(ChargebackReportBase):
+    """Schema for chargeback report response."""
+
+    id: str
+    total_cost: Decimal
+    compute_cost: Optional[Decimal] = None
+    storage_cost: Optional[Decimal] = None
+    network_cost: Optional[Decimal] = None
+    other_cost: Optional[Decimal] = None
+    currency: str = "USD"
+    resource_count: int = 0
+    active_instances: int = 0
+    storage_gb: Optional[Decimal] = None
+    budget_amount: Optional[Decimal] = None
+    budget_variance: Optional[Decimal] = None
+    budget_variance_percent: Optional[float] = None
+    status: str
+    generated_at: datetime
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+class ChargebackSummary(BaseModel):
+    """Summary of chargeback by team."""
+
+    team: str
+    total_cost: Decimal
+    resource_count: int
+    percentage_of_total: float
+    trend_percent: Optional[float] = None
+
+
+# ============ Cost Forecast Schemas ============
+
+class CostForecastRequest(BaseModel):
+    """Request schema for cost forecast."""
+
+    forecast_start: datetime
+    forecast_end: datetime
+    cloud_provider: Optional[CloudProvider] = None
+    cluster_id: Optional[str] = None
+    team: Optional[str] = None
+    project: Optional[str] = None
+    budget_amount: Optional[Decimal] = None
+
+
+class CostForecastResponse(BaseModel):
+    """Schema for cost forecast response."""
+
+    id: str
+    forecast_start: datetime
+    forecast_end: datetime
+    base_period_start: datetime
+    base_period_end: datetime
+    cloud_provider: Optional[CloudProvider] = None
+    cluster_id: Optional[str] = None
+    team: Optional[str] = None
+    project: Optional[str] = None
+    predicted_cost: Decimal
+    confidence_low: Optional[Decimal] = None
+    confidence_high: Optional[Decimal] = None
+    confidence_level: Optional[float] = None
+    current_cost: Optional[Decimal] = None
+    previous_period_cost: Optional[Decimal] = None
+    trend_percent: Optional[float] = None
+    seasonality_detected: bool = False
+    budget_amount: Optional[Decimal] = None
+    budget_variance: Optional[Decimal] = None
+    budget_exceed_date: Optional[datetime] = None
+    currency: str = "USD"
+    forecast_method: str
+    mape: Optional[float] = None
+    generated_at: datetime
+    status: str
+
+    class Config:
+        from_attributes = True
+
+
+class ForecastSummary(BaseModel):
+    """Summary of forecast data."""
+
+    total_predicted_cost: Decimal
+    currency: str = "USD"
+    forecast_period_start: datetime
+    forecast_period_end: datetime
+    overall_trend_percent: float
+    budget_status: str  # on_track, at_risk, exceeded
+    potential_budget_variance: Optional[Decimal] = None
+    budget_exceed_date: Optional[datetime] = None

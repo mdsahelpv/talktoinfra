@@ -1,3 +1,4 @@
+import { useNavigate } from 'react-router-dom';
 import {
   MessageSquare,
   Play,
@@ -6,22 +7,135 @@ import {
   Clock,
   TrendingUp,
   Activity,
+  Server,
+  Bell,
+  Workflow,
+  Plus,
+  ArrowRight,
+  Zap,
+  Shield,
+  CreditCard,
 } from 'lucide-react';
-import { Card, CardContent, CardHeader, CardTitle, Badge, Spinner } from '@/components/ui';
+import { Card, CardContent, CardHeader, CardTitle, Badge, Spinner, Button, HelpTooltip } from '@/components/ui';
 import { useDashboardStats, useRecentActivity } from '@/hooks/useDashboard';
 import { formatRelativeTime } from '@/utils';
+import { useOnboardingStore } from '@/stores/onboarding';
+
+interface QuickAction {
+  id: string;
+  title: string;
+  description: string;
+  icon: React.ElementType;
+  path: string;
+  color: string;
+}
+
+const quickActions: QuickAction[] = [
+  {
+    id: 'chat',
+    title: 'Ask AI',
+    description: 'Query your infrastructure',
+    icon: MessageSquare,
+    path: '/chat',
+    color: 'bg-purple-500/10 text-purple-500',
+  },
+  {
+    id: 'connect',
+    title: 'Connect Cluster',
+    description: 'Add a new cluster',
+    icon: Server,
+    path: '/onboarding',
+    color: 'bg-blue-500/10 text-blue-500',
+  },
+  {
+    id: 'discover',
+    title: 'Discover Resources',
+    description: 'Scan your infrastructure',
+    icon: Zap,
+    path: '/infra',
+    color: 'bg-green-500/10 text-green-500',
+  },
+  {
+    id: 'alerts',
+    title: 'View Alerts',
+    description: 'Check monitoring status',
+    icon: Bell,
+    path: '/monitoring',
+    color: 'bg-red-500/10 text-red-500',
+  },
+  {
+    id: 'workflows',
+    title: 'Workflows',
+    description: 'Manage automation',
+    icon: Workflow,
+    path: '/workflows',
+    color: 'bg-orange-500/10 text-orange-500',
+  },
+  {
+    id: 'cost',
+    title: 'Cost Overview',
+    description: 'View spending',
+    icon: CreditCard,
+    path: '/cost',
+    color: 'bg-teal-500/10 text-teal-500',
+  },
+];
 
 export default function DashboardPage() {
+  const navigate = useNavigate();
   const { data: stats, isLoading: statsLoading } = useDashboardStats();
   const { data: activities, isLoading: activityLoading } = useRecentActivity();
+  const { progress: onboardingProgress, isOnboardingComplete } = useOnboardingStore();
 
   return (
     <div className="space-y-6">
+      {/* Header with Onboarding Progress */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold">Dashboard</h1>
+          <p className="text-sm text-muted-foreground">
+            Overview of your infrastructure operations
+          </p>
+        </div>
+        <div className="flex items-center gap-2">
+          <HelpTooltip />
+          {!isOnboardingComplete && onboardingProgress.startedAt && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => navigate('/welcome')}
+              className="gap-2"
+            >
+              <Shield className="h-4 w-4" />
+              Continue Setup
+              <Badge variant="secondary" className="ml-1">
+                {Math.round(((onboardingProgress.currentStep + 1) / onboardingProgress.totalSteps) * 100)}%
+              </Badge>
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {/* Quick Actions */}
       <div>
-        <h1 className="text-2xl font-bold">Dashboard</h1>
-        <p className="text-sm text-muted-foreground">
-          Overview of your infrastructure operations
-        </p>
+        <h2 className="text-lg font-semibold mb-4">Quick Actions</h2>
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+          {quickActions.map((action) => (
+            <button
+              key={action.id}
+              onClick={() => navigate(action.path)}
+              className="flex flex-col items-center gap-2 p-4 rounded-lg border bg-card hover:bg-accent transition-colors text-center"
+            >
+              <div className={`p-2 rounded-lg ${action.color}`}>
+                <action.icon className="h-5 w-5" />
+              </div>
+              <div>
+                <p className="font-medium text-sm">{action.title}</p>
+                <p className="text-xs text-muted-foreground">{action.description}</p>
+              </div>
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Stats Grid */}
@@ -76,9 +190,18 @@ export default function DashboardPage() {
                 ))}
               </div>
             ) : (
-              <p className="text-center text-muted-foreground py-8">
-                No recent activity
-              </p>
+              <div className="text-center py-8">
+                <p className="text-muted-foreground mb-4">No recent activity</p>
+                <Button
+                  variant="outline"
+                  onClick={() => navigate('/chat')}
+                  className="gap-2"
+                >
+                  <MessageSquare className="h-4 w-4" />
+                  Start a Conversation
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
+              </div>
             )}
           </CardContent>
         </Card>

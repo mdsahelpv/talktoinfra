@@ -29,6 +29,7 @@ from tasks import (
     workflow_executions,
     workflow_definitions,
 )
+from rollback import get_rollback_engine, ExecutionHistory
 
 # Configure logging
 structlog.configure(
@@ -169,7 +170,8 @@ class WorkflowExecution(BaseModel):
 
     # Timestamps
     created_at: str = Field(
-        default_factory=lambda: time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+        default_factory=lambda: time.strftime(
+            "%Y-%m-%dT%H:%M:%SZ", time.gmtime())
     )
     started_at: Optional[str] = None
     completed_at: Optional[str] = None
@@ -190,6 +192,9 @@ settings = get_settings()
 # Initialize Redis client and state cache
 redis_client = get_redis_client()
 state_cache = RedisStateCache(redis_client, ttl=settings.state_cache_ttl)
+
+# Execution history storage (in-memory for now, can be backed by Redis/DB)
+execution_histories: Dict[str, ExecutionHistory] = {}
 
 app = FastAPI(
     title="Workflow Service",
@@ -291,7 +296,7 @@ async def list_workflows(
 
     return {
         "items": [
-            w.model_dump(exclude={"steps"}) for w in workflows[skip : skip + limit]
+            w.model_dump(exclude={"steps"}) for w in workflows[skip: skip + limit]
         ],
         "total": len(workflows),
         "skip": skip,
@@ -566,7 +571,7 @@ async def list_executions(
         executions = [e for e in executions if e.status.value == status]
 
     return {
-        "items": [e.model_dump() for e in executions[skip : skip + limit]],
+        "items": [e.model_dump() for e in executions[skip: skip + limit]],
         "total": len(executions),
         "skip": skip,
         "limit": limit,
@@ -608,7 +613,11 @@ async def cancel_execution(execution_id: str) -> Dict[str, Any]:
 
 @app.post("/api/v1/executions/{execution_id}/rollback")
 async def rollback_execution(execution_id: str) -> Dict[str, Any]:
-    """Rollback a completed or failed workflow execution."""
+    """Rollback a completed or failed workflow execution.
+
+    Executes compensating actions for each step that was executed,
+    in reverse order, to undo the workflow's effects.
+    """
     if execution_id not in workflow_executions:
         raise HTTPException(status_code=404, detail="Execution not found")
 
@@ -619,13 +628,77 @@ async def rollback_execution(execution_id: str) -> Dict[str, Any]:
             status_code=400, detail="Can only rollback completed or failed executions"
         )
 
+    # Get the workflow definition
+    workflow = workflow_definitions.get(execution.workflow_id)
+    if not workflow:
+        raise HTTPException(status_code=404, detail="Workflow not found")
+
     execution.status = WorkflowStatus.ROLLING_BACK
 
-    logger.info("workflow_execution_rollback_started", execution_id=execution_id)
+    # Get the rollback engine
+    rollback_engine = get_rollback_engine()
+
+    # Get step results from execution
+    step_results = execution.results
+
+    # Execute rollback
+    rollback_result = await rollback_engine.rollback_workflow(
+        execution_id=execution_id,
+        workflow_id=execution.workflow_id,
+        steps=[step.model_dump() for step in workflow.steps],
+        step_results=step_results,
+        context=execution.context,
+    )
+
+    # Update execution status
+    if rollback_result.get("failed_rollbacks"):
+        execution.status = WorkflowStatus.FAILED
+    else:
+        execution.status = WorkflowStatus.COMPLETED
+
+    execution.completed_at = time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())
+
+    logger.info(
+        "workflow_execution_rollback_completed",
+        execution_id=execution_id,
+        steps_rolled_back=rollback_result.get("total_steps_rolled_back"),
+        failed_rollbacks=len(rollback_result.get("failed_rollbacks", [])),
+    )
+
     return {
         "execution_id": execution_id,
-        "status": WorkflowStatus.ROLLING_BACK.value,
-        "message": "Rollback initiated",
+        "status": execution.status.value,
+        "rollback_result": rollback_result,
+    }
+
+
+@app.get("/api/v1/executions/{execution_id}/history")
+async def get_execution_history(execution_id: str) -> Dict[str, Any]:
+    """Get the execution history for a workflow execution.
+
+    Returns the complete history including:
+    - All events that occurred during execution
+    - Step results
+    - Rollback history (if applicable)
+    """
+    if execution_id not in workflow_executions:
+        raise HTTPException(status_code=404, detail="Execution not found")
+
+    execution = workflow_executions[execution_id]
+
+    # Get history from storage if available
+    history = execution_histories.get(execution_id)
+
+    if not history:
+        # Create a new history from execution data
+        history = ExecutionHistory(execution_id, execution.workflow_id)
+        # Populate with existing events/results
+        for step_id, result in execution.results.items():
+            history.record_step_result(step_id, result)
+
+    return {
+        "execution_id": execution_id,
+        "history": history.to_dict(),
     }
 
 
@@ -652,7 +725,8 @@ TEMPLATE_KUBERNETES_DEPLOYMENT = WorkflowDefinition(
             name="Update Kubernetes",
             type=StepType.ACTION,
             order=2,
-            config={"action": "kubectl_apply", "manifest": "k8s/deployment.yaml"},
+            config={"action": "kubectl_apply",
+                    "manifest": "k8s/deployment.yaml"},
         ),
         WorkflowStep(
             name="Wait for Rollout",

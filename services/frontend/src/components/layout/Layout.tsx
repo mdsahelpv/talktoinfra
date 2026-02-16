@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/utils';
 import { useAuthStore, useUIStore } from '@/stores';
-import { Button } from '@/components/ui';
+import { Button, CommandPalette } from '@/components/ui';
 
 const navItems = [
   { path: '/chat', label: 'Chat', icon: MessageSquare },
@@ -119,13 +119,26 @@ export default function Layout() {
           <Bot className="h-6 w-6 text-primary" />
           <span className="font-semibold">TalkAI</span>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-        >
-          <Menu className="h-6 w-6" />
-        </Button>
+        <div className="flex items-center gap-2">
+          <div className="w-48">
+            <CommandPalette />
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+          >
+            <Menu className="h-6 w-6" />
+          </Button>
+        </div>
+      </div>
+
+      {/* Desktop Header with Command Palette */}
+      <div className="hidden lg:flex fixed top-0 left-64 right-0 z-40 h-16 items-center justify-between border-b bg-card/95 backdrop-blur px-6">
+        <CommandPalette />
+        <div className="flex items-center gap-2">
+          {/* Onboarding Progress Indicator */}
+        </div>
       </div>
 
       {/* Mobile Menu */}
@@ -171,7 +184,7 @@ export default function Layout() {
       )}
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto lg:pt-0 pt-16">
+      <main className="flex-1 overflow-auto lg:pt-16 pt-16">
         <div className="h-full p-4 lg:p-8">
           <Outlet />
         </div>

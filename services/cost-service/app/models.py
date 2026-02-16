@@ -317,3 +317,236 @@ class DailyCostAggregation(Base):
         Index("idx_daily_agg_provider_date", "cloud_provider", "date"),
         Index("idx_daily_agg_cluster_date", "cluster_id", "date"),
     )
+
+
+class CostTag(Base):
+    """Database model for cost tagging and attribution."""
+
+    __tablename__ = "cost_tags"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    cluster_id = Column(String(255), nullable=True, index=True)
+    cloud_provider = Column(SQLEnum(CloudProvider), nullable=False)
+    account_id = Column(String(255), nullable=True)
+
+    # Tag dimensions
+    team = Column(String(100), nullable=True, index=True)
+    project = Column(String(100), nullable=True, index=True)
+    environment = Column(String(50), nullable=True,
+                         index=True)  # prod, staging, dev
+    service = Column(String(100), nullable=True, index=True)
+    namespace = Column(String(255), nullable=True, index=True)
+
+    # Additional custom tags
+    custom_tags = Column(JSON, nullable=True)
+
+    # Resource association
+    resource_id = Column(String(255), nullable=True, index=True)
+    resource_type = Column(String(100), nullable=True)
+
+    # Cost data associated with this tag
+    cost_amount = Column(NUMERIC(precision=12, scale=6),
+                         nullable=False, default=0)
+
+    # Timestamps
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True),
+                        default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Effective period
+    period_start = Column(DateTime(timezone=True), nullable=False)
+    period_end = Column(DateTime(timezone=True), nullable=False)
+
+    __table_args__ = (
+        Index("idx_cost_tag_period", "period_start", "period_end"),
+        Index("idx_cost_tag_team_project", "team", "project"),
+    )
+
+
+class CostAnomaly(Base):
+    """Database model for cost anomaly detection results."""
+
+    __tablename__ = "cost_anomalies"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    cluster_id = Column(String(255), nullable=True, index=True)
+    cloud_provider = Column(SQLEnum(CloudProvider), nullable=False)
+
+    # Anomaly type
+    # spending_spike, new_expensive_resource, idle_resource,
+    # data_transfer_spike, unused_volume, price_change
+    anomaly_type = Column(String(50), nullable=False, index=True)
+
+    # Severity: info, warning, critical
+    severity = Column(String(20), default="warning")
+
+    # Detection details
+    title = Column(String(255), nullable=False)
+    description = Column(Text, nullable=False)
+
+    # Baseline and current values
+    baseline_value = Column(NUMERIC(precision=12, scale=6), nullable=True)
+    current_value = Column(NUMERIC(precision=12, scale=6), nullable=True)
+    expected_value = Column(NUMERIC(precision=12, scale=6), nullable=True)
+
+    # Percentage change
+    change_percent = Column(Float, nullable=True)
+
+    # Affected resource
+    resource_id = Column(String(255), nullable=True, index=True)
+    resource_name = Column(String(255), nullable=True)
+    resource_type = Column(String(100), nullable=True)
+    service_name = Column(String(255), nullable=True)
+
+    # Financial impact
+    cost_impact = Column(NUMERIC(precision=12, scale=6),
+                         nullable=True)  # Monthly impact
+    currency = Column(String(3), default="USD")
+
+    # Status
+    # active, investigated, acknowledged, resolved, dismissed
+    status = Column(String(20), default="active", index=True)
+
+    # Detection metadata
+    # zscore, iqr, threshold
+    detection_method = Column(String(50), nullable=True)
+    confidence_score = Column(Float, nullable=True)
+
+    # Timestamps
+    detected_at = Column(DateTime(timezone=True),
+                         default=datetime.utcnow, index=True)
+    acknowledged_at = Column(DateTime(timezone=True), nullable=True)
+    resolved_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True),
+                        default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Additional data
+    metadata = Column(JSON, nullable=True)
+
+    __table_args__ = (
+        Index("idx_anomaly_status_detected", "status", "detected_at"),
+        Index("idx_anomaly_provider_type", "cloud_provider", "anomaly_type"),
+    )
+
+
+class ChargebackReport(Base):
+    """Database model for chargeback reports (team cost attribution)."""
+
+    __tablename__ = "chargeback_reports"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Report period
+    period_start = Column(DateTime(timezone=True), nullable=False)
+    period_end = Column(DateTime(timezone=True), nullable=False)
+
+    # Chargeback dimensions
+    team = Column(String(100), nullable=False, index=True)
+    project = Column(String(100), nullable=True, index=True)
+    environment = Column(String(50), nullable=True)
+
+    # Cloud provider breakdown
+    cloud_provider = Column(SQLEnum(CloudProvider), nullable=True)
+
+    # Cost breakdown
+    total_cost = Column(NUMERIC(precision=12, scale=6), nullable=False)
+    compute_cost = Column(NUMERIC(precision=12, scale=6), nullable=True)
+    storage_cost = Column(NUMERIC(precision=12, scale=6), nullable=True)
+    network_cost = Column(NUMERIC(precision=12, scale=6), nullable=True)
+    other_cost = Column(NUMERIC(precision=12, scale=6), nullable=True)
+
+    currency = Column(String(3), default="USD")
+
+    # Resource counts
+    resource_count = Column(Integer, default=0)
+    active_instances = Column(Integer, default=0)
+    storage_gb = Column(NUMERIC(precision=12, scale=2), default=0)
+
+    # Cost per unit
+    cost_per_unit = Column(NUMERIC(precision=12, scale=6), nullable=True)
+
+    # Budget comparison
+    budget_amount = Column(NUMERIC(precision=12, scale=2), nullable=True)
+    budget_variance = Column(NUMERIC(precision=12, scale=2), nullable=True)
+    budget_variance_percent = Column(Float, nullable=True)
+
+    # Status
+    status = Column(String(20), default="draft")  # draft, finalized, invoiced
+
+    # Timestamps
+    generated_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    updated_at = Column(DateTime(timezone=True),
+                        default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    # Raw data reference
+    raw_data = Column(JSON, nullable=True)
+
+    __table_args__ = (
+        Index("idx_chargeback_period", "period_start", "period_end"),
+        Index("idx_chargeback_team", "team", "period_start"),
+    )
+
+
+class CostForecast(Base):
+    """Database model for cost forecasting data."""
+
+    __tablename__ = "cost_forecasts"
+
+    id = Column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+
+    # Forecast period
+    forecast_start = Column(DateTime(timezone=True), nullable=False)
+    forecast_end = Column(DateTime(timezone=True), nullable=False)
+
+    # Base period for forecasting
+    base_period_start = Column(DateTime(timezone=True), nullable=False)
+    base_period_end = Column(DateTime(timezone=True), nullable=False)
+
+    # Forecast dimensions
+    cloud_provider = Column(SQLEnum(CloudProvider), nullable=True)
+    cluster_id = Column(String(255), nullable=True)
+    team = Column(String(100), nullable=True)
+    project = Column(String(100), nullable=True)
+
+    # Forecast values
+    predicted_cost = Column(NUMERIC(precision=12, scale=6), nullable=False)
+    confidence_low = Column(NUMERIC(precision=12, scale=6), nullable=True)
+    confidence_high = Column(NUMERIC(precision=12, scale=6), nullable=True)
+    confidence_level = Column(Float, nullable=True)  # 0-100
+
+    # Comparison values
+    current_cost = Column(NUMERIC(precision=12, scale=6), nullable=True)
+    previous_period_cost = Column(
+        NUMERIC(precision=12, scale=6), nullable=True)
+
+    # Trend analysis
+    trend_percent = Column(Float, nullable=True)  # Month-over-month growth
+    seasonality_detected = Column(Integer, default=0)  # Boolean as int
+
+    # Budget comparison
+    budget_amount = Column(NUMERIC(precision=12, scale=2), nullable=True)
+    budget_variance = Column(NUMERIC(precision=12, scale=2), nullable=True)
+    budget_exceed_date = Column(DateTime(timezone=True), nullable=True)
+
+    currency = Column(String(3), default="USD")
+
+    # Forecast method
+    # linear_regression, exponential_smoothing, arima
+    forecast_method = Column(String(50), default="linear_regression")
+
+    # Model accuracy
+    mape = Column(Float, nullable=True)  # Mean Absolute Percentage Error
+
+    # Timestamps
+    generated_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+
+    # Status
+    status = Column(String(20), default="active")  # active, outdated
+
+    __table_args__ = (
+        Index("idx_forecast_period", "forecast_start", "forecast_end"),
+        Index("idx_forecast_provider", "cloud_provider", "forecast_start"),
+    )
