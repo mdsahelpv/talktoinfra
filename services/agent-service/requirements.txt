@@ -19,6 +19,27 @@ redis==5.0.1
 # Kubernetes
 kubernetes==29.0.0
 
+# Cloud Providers
+boto3>=1.33.0
+aiobotocore>=2.7.0
+
+# Azure
+azure-identity>=1.15.0
+azure-mgmt-compute>=30.0.0
+azure-mgmt-containerinstance>=10.1.0
+azure-mgmt-containerregistry>=10.3.0
+azure-mgmt-containerservice>=23.0.0
+azure-mgmt-storage>=21.1.0
+azure-mgmt-network>=23.0.0
+
+# GCP
+google-cloud>=0.34.0
+google-cloud-compute>=1.14.0
+google-cloud-container>=4.0.0
+google-cloud-storage>=2.10.0
+google-cloud-monitoring>=2.15.0
+google-cloud-logging>=3.8.0
+
 # Async & Concurrency
 asyncio-mqtt==0.16.1
 aiohttp==3.9.3

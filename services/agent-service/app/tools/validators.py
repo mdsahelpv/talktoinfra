@@ -244,6 +244,146 @@ class DescribeResourceInput(BaseModel):
         return K8sNamespace(namespace=v).namespace
 
 
+class ScaleDeploymentInput(BaseModel):
+    """Input validation for scale deployment operations."""
+
+    deployment_name: str
+    namespace: str
+    replicas: int
+
+    @validator("deployment_name")
+    def validate_deployment_name(cls, v: str) -> str:
+        return K8sResourceName(name=v).name
+
+    @validator("namespace")
+    def validate_namespace(cls, v: str) -> str:
+        return K8sNamespace(namespace=v).namespace
+
+    @validator("replicas")
+    def validate_replicas(cls, v: int) -> int:
+        if v < 0:
+            raise ValueError("Replicas must be non-negative")
+        if v > 1000:
+            raise ValueError("Replicas cannot exceed 1000")
+        return v
+
+
+class RestartPodInput(BaseModel):
+    """Input validation for restart pod operations."""
+
+    pod_name: str
+    namespace: str
+
+    @validator("pod_name")
+    def validate_pod_name(cls, v: str) -> str:
+        return K8sResourceName(name=v).name
+
+    @validator("namespace")
+    def validate_namespace(cls, v: str) -> str:
+        return K8sNamespace(namespace=v).namespace
+
+
+class DeleteResourceInput(BaseModel):
+    """Input validation for delete resource operations."""
+
+    resource_type: str
+    resource_name: str
+    namespace: str
+
+    ALLOWED_DELETE_TYPES: Set[str] = {
+        "pod", "pods",
+        "service", "services", "svc",
+        "deployment", "deployments", "deploy",
+        "configmap", "configmaps", "cm",
+        "secret", "secrets",
+        "job", "jobs",
+        "pvc", "persistentvolumeclaim", "persistentvolumeclaims",
+    }
+
+    @validator("resource_type")
+    def validate_resource_type(cls, v: str) -> str:
+        v_lower = v.lower()
+        if v_lower not in cls.ALLOWED_DELETE_TYPES:
+            raise ValueError(
+                f"Resource type '{v}' is not allowed for deletion. Allowed types: {', '.join(sorted(cls.ALLOWED_DELETE_TYPES))}"
+            )
+        return v_lower
+
+    @validator("resource_name")
+    def validate_resource_name(cls, v: str) -> str:
+        return K8sResourceName(name=v).name
+
+    @validator("namespace")
+    def validate_namespace(cls, v: str) -> str:
+        return K8sNamespace(namespace=v).namespace
+
+
+class ExecCommandInput(BaseModel):
+    """Input validation for exec command operations."""
+
+    pod_name: str
+    namespace: str
+    command: List[str]
+    container: Optional[str] = None
+    timeout: int = 30
+
+    @validator("pod_name")
+    def validate_pod_name(cls, v: str) -> str:
+        return K8sResourceName(name=v).name
+
+    @validator("namespace")
+    def validate_namespace(cls, v: str) -> str:
+        return K8sNamespace(namespace=v).namespace
+
+    @validator("command")
+    def validate_command(cls, v: List[str]) -> List[str]:
+        if not v:
+            raise ValueError("Command cannot be empty")
+        # Validate each command part
+        for cmd in v:
+            if not cmd:
+                raise ValueError("Command parts cannot be empty")
+        return v
+
+    @validator("timeout")
+    def validate_timeout(cls, v: int) -> int:
+        if v < 1:
+            raise ValueError("Timeout must be at least 1 second")
+        if v > 300:
+            raise ValueError("Timeout cannot exceed 300 seconds")
+        return v
+
+
+class PortForwardInput(BaseModel):
+    """Input validation for port forward operations."""
+
+    pod_name: str
+    namespace: str
+    local_port: int
+    target_port: int
+    container: Optional[str] = None
+
+    @validator("pod_name")
+    def validate_pod_name(cls, v: str) -> str:
+        return K8sResourceName(name=v).name
+
+    @validator("namespace")
+    def validate_namespace(cls, v: str) -> str:
+        return K8sNamespace(namespace=v).namespace
+
+    @validator("local_port")
+    def validate_local_port(cls, v: int) -> int:
+        if v < 1 or v > 65535:
+            raise ValueError("Local port must be between 1 and 65535")
+        return v
+
+    @validator("target_port")
+    def validate_target_port(cls, v: int) -> int:
+        if v < 1 or v > 65535:
+            raise ValueError("Target port must be between 1 and 65535")
+        return v
+
+
 def validate_no_shell_injection(value: str) -> ValidationResult:
     """Validate that a string contains no shell injection attempts."""
     try:

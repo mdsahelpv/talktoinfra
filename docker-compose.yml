@@ -417,6 +417,83 @@ services:
       timeout: 5s
       retries: 3
 
+  # User Service (Authentication & User Management)
+  user-service:
+    build:
+      context: ./services/user-service
+      dockerfile: Dockerfile
+    container_name: opsai-user-service
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8008
+      - DATABASE_URL=postgresql://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}_users
+      - DATABASE_URL_ASYNC=postgresql+asyncpg://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}_users
+      - REDIS_URL=redis://redis:6379/6
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+    ports:
+      - "8008:8008"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - opsai
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8008/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # Notification Service (Multi-channel notifications)
+  notification-service:
+    build:
+      context: ./services/notification-service
+      dockerfile: Dockerfile
+    container_name: opsai-notification-service
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8013
+      - DATABASE_URL=postgresql+asyncpg://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - REDIS_URL=redis://redis:6379/7
+      - SMTP_HOST=${SMTP_HOST:-}
+      - SMTP_PORT=${SMTP_PORT:-587}
+      - SMTP_USER=${SMTP_USER:-}
+      - SMTP_PASSWORD=${SMTP_PASSWORD:-}
+      - SLACK_BOT_TOKEN=${SLACK_BOT_TOKEN:-}
+      - TEAMS_WEBHOOK_URL=${TEAMS_WEBHOOK_URL:-}
+      - PAGERDUTY_API_KEY=${PAGERDUTY_API_KEY:-}
+    ports:
+      - "8013:8013"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - opsai
+    restart: unless-stopped
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "import urllib.request; urllib.request.urlopen('http://localhost:8013/health')",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
   # Frontend
   frontend:
     build:
