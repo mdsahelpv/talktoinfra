@@ -52,7 +52,7 @@ services:
       QDRANT__SERVICE__HTTP_PORT: 6333
       QDRANT__LOG_LEVEL: INFO
     healthcheck:
-      test: ["CMD", "wget", "-q", "--spider", "http://localhost:6333/healthz"]
+      test: ["CMD", "curl", "-f", "http://localhost:6333/healthz"]
       interval: 5s
       timeout: 3s
       retries: 5
@@ -492,6 +492,80 @@ services:
         ]
       interval: 10s
       timeout: 5s
+      retries: 3
+
+  # Onboarding Service (K8s Cluster Onboarding)
+  onboarding-service:
+    build:
+      context: ./services/onboarding-service
+      dockerfile: Dockerfile
+    container_name: opsai-onboarding-service
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8011
+      - DATABASE_URL=postgresql://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - REDIS_URL=redis://redis:6379/8
+      - JWT_SECRET=${JWT_SECRET:-your-secret-key}
+    ports:
+      - "8011:8011"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - opsai
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8011/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Workflow Service (Celery-based Workflow Orchestration)
+  workflow-service:
+    build:
+      context: ./services/workflow-service
+      dockerfile: Dockerfile
+    container_name: opsai-workflow-service
+    env_file:
+      - .env
+    environment:
+      - SERVICE_PORT=8012
+      - POSTGRES_URL=postgresql://${DB_USER:-opsai}:${DB_PASSWORD:-changeme}@postgres:5432/${DB_NAME:-opsai}
+      - REDIS_HOST=redis
+      - REDIS_PORT=6379
+      - REDIS_DB=2
+      - NATS_URL=nats://nats:4222
+      - CELERY_BROKER_URL=redis://redis:6379/14
+      - CELERY_RESULT_BACKEND=redis://redis:6379/15
+      - ACTION_ENGINE_URL=http://action-engine:8002
+      - NOTIFICATION_URL=http://notification-service:8013
+    ports:
+      - "8012:8012"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      nats:
+        condition: service_started
+      action-engine:
+        condition: service_started
+      notification-service:
+        condition: service_started
+    networks:
+      - opsai
+    restart: unless-stopped
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import httpx; httpx.get('http://localhost:8012/health').raise_for_status()"]
+      interval: 30s
+      timeout: 10s
       retries: 3
 
   # Frontend

@@ -131,15 +131,16 @@ async def logging_middleware(request: Request, call_next):
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
 
-    with structlog.contextvars.bind_contextvars(
+    # Bind context variables for logging
+    structlog.contextvars.bind_contextvars(
         request_id=request_id,
         method=request.method,
         path=request.url.path,
-    ):
-        logger.info("request_started")
-        response = await call_next(request)
-        logger.info("request_completed", status_code=response.status_code)
-        return response
+    )
+    logger.info("request_started")
+    response = await call_next(request)
+    logger.info("request_completed", status_code=response.status_code)
+    return response
 
 
 @app.get("/health")
@@ -151,6 +152,13 @@ async def health_check():
         "timestamp": time.time(),
         "components": {},
     }
+
+    # Check if service is initialized
+    if embedding_generator is None or worker is None:
+        health["status"] = "starting"
+        health["components"]["embedding_generator"] = "initializing"
+        health["components"]["vector_store"] = "initializing"
+        return health
 
     # Check embedding generator
     try:

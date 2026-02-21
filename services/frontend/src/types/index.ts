@@ -9,6 +9,11 @@ export interface SourceCitation {
   score: number;
   source: string;
   source_id: string;
+  // Additional properties for UI display
+  title?: string;
+  content?: string;
+  relevance?: number;
+  url?: string;
   raw_data?: Record<string, unknown>;
   metadata?: {
     discovered_at?: string;

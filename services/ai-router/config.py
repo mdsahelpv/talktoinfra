@@ -25,8 +25,8 @@ class Settings(BaseSettings):
 
     # Ollama Configuration
     ollama_host: str = "http://localhost:11434"
-    ollama_model_chat: str = "llama3.3:70b"
-    ollama_model_code: str = "codellama:34b"
+    ollama_model_chat: str = "llama3.1:8b"
+    ollama_model_code: str = "mistral:latest"
     ollama_model_embed: str = "nomic-embed-text"
 
     # RAG Configuration

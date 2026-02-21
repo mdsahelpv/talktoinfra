@@ -1,4 +1,4 @@
-"""Alert List Component - Displays alerts with filtering and actions."""
+// Alert List Component - Displays alerts with filtering and actions.
 
 import React, { useState, useEffect } from 'react';
 import { Badge, Button, Card, Table, Tag, Modal, Form, Input, Select, Space, Tooltip } from 'antd';

@@ -88,6 +88,20 @@ async def lifespan(app: FastAPI):
         model_code=settings.ollama_model_code,
     )
 
+    # Create database tables
+    try:
+        await conversation_manager.create_tables()
+        logger.info("database_tables_created")
+    except Exception as e:
+        logger.warning("database_tables_creation_failed", error=str(e))
+
+    # Ensure RAG collection exists
+    try:
+        await rag_engine.ensure_collection()
+        logger.info("rag_collection_ready")
+    except Exception as e:
+        logger.warning("rag_collection_creation_failed", error=str(e))
+
     # Test connections
     try:
         await rag_engine.health_check()
@@ -128,15 +142,16 @@ async def logging_middleware(request: Request, call_next):
     request_id = str(uuid.uuid4())
     request.state.request_id = request_id
 
-    with structlog.contextvars.bind_contextvars(
+    # Bind context variables for logging
+    structlog.contextvars.bind_contextvars(
         request_id=request_id,
         method=request.method,
         path=request.url.path,
-    ):
-        logger.info("request_started")
-        response = await call_next(request)
-        logger.info("request_completed", status_code=response.status_code)
-        return response
+    )
+    logger.info("request_started")
+    response = await call_next(request)
+    logger.info("request_completed", status_code=response.status_code)
+    return response
 
 
 @app.get("/health")
@@ -148,6 +163,13 @@ async def health_check():
         "timestamp": time.time(),
         "components": {},
     }
+
+    # Check if service is initialized
+    if rag_engine is None or llm_client is None:
+        health["status"] = "starting"
+        health["components"]["rag_engine"] = "initializing"
+        health["components"]["llm_client"] = "initializing"
+        return health
 
     # Check RAG engine
     try:
@@ -183,6 +205,12 @@ async def process_query(
             query.conversation_id, query.user_id
         )
 
+        # Handle both dict and ORM object
+        if isinstance(conversation, dict):
+            conversation_id = conversation.get("id")
+        else:
+            conversation_id = conversation.id
+
         # 2. Classify intent
         intent = intent_classifier.classify(query.query)
         logger.info(
@@ -209,12 +237,12 @@ async def process_query(
 
         # 5. Store in conversation history
         await conversation_manager.add_message(
-            conversation_id=conversation.id,
+            conversation_id=conversation_id,
             role="user",
             content=query.query,
         )
         await conversation_manager.add_message(
-            conversation_id=conversation.id,
+            conversation_id=conversation_id,
             role="assistant",
             content=response_text,
             metadata={
@@ -229,12 +257,21 @@ async def process_query(
             "query_processed",
             duration=duration,
             intent=intent.intent,
-            conversation_id=conversation.id,
+            conversation_id=conversation_id,
         )
 
         return QueryResponse(
             response=response_text,
-            conversation_id=conversation.id,
+            conversation_id=conversation_id,
+            intent={
+                "intent": intent.intent,
+                "confidence": intent.confidence,
+                "entities": intent.entities,
+                "action_type": intent.action_type,
+                "target_resource": intent.target_resource,
+                "requires_approval": intent.requires_approval,
+                "risk_level": intent.risk_level,
+            },
             sources=sources,
             metadata={
                 "intent": intent.intent,
@@ -285,8 +322,17 @@ async def build_context(
     """Build context for query processing with Hierarchical RAG."""
     global citation_engine
 
+    # Handle both dict and ORM object
+    if conversation:
+        if isinstance(conversation, dict):
+            messages = conversation.get("messages", [])
+        else:
+            messages = conversation.messages or []
+    else:
+        messages = []
+
     context = {
-        "conversation_history": conversation.messages[-5:] if conversation else [],
+        "conversation_history": messages[-5:] if messages else [],
         "user_context": query.context or {},
         "timestamp": time.time(),
     }

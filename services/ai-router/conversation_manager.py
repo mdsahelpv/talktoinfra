@@ -342,6 +342,12 @@ class ConversationManager:
         logger.info("conversation_deleted", conversation_id=conversation_id)
         return True
 
+    async def create_tables(self):
+        """Create database tables if they don't exist."""
+        async with self.engine.begin() as conn:
+            await conn.run_sync(Base.metadata.create_all)
+        logger.info("database_tables_created")
+
     async def close(self):
         """Close database connections."""
         if self.redis:

@@ -21,6 +21,23 @@ const PORT_PRESETS: Record<string, number[]> = {
 
 const POLLING_INTERVAL = 1500;
 
+// CIDR validation helper
+function validateCIDR(cidr: string): boolean {
+  const cidrRegex = /^(\d{1,3}\.){3}\d{1,3}\/\d{1,2}$/;
+  if (!cidrRegex.test(cidr)) return false;
+  const [ip, mask] = cidr.split('/');
+  const maskNum = parseInt(mask, 10);
+  const parts = ip.split('.').map(Number);
+  return maskNum >= 0 && maskNum <= 32 && parts.every(p => p >= 0 && p <= 255);
+}
+
+// Calculate network size from CIDR
+function getNetworkSize(cidr: string): number {
+  const [, mask] = cidr.split('/');
+  const maskNum = parseInt(mask, 10);
+  return Math.pow(2, 32 - maskNum);
+}
+
 export default function InfrastructureDiscovery() {
   const [ipRange, setIpRange] = useState('');
   const [selectedPorts, setSelectedPorts] = useState<number[]>(PORT_PRESETS.talkai);

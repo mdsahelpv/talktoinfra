@@ -35,7 +35,7 @@ azure-mgmt-network>=23.0.0
 # GCP
 google-cloud>=0.34.0
 google-cloud-compute>=1.14.0
-google-cloud-container>=4.0.0
+google-cloud-container>=1.0.0
 google-cloud-storage>=2.10.0
 google-cloud-monitoring>=2.15.0
 google-cloud-logging>=3.8.0

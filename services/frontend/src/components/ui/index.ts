@@ -10,3 +10,5 @@ export { default as Pagination } from './Pagination';
 export { default as CommandPalette } from './CommandPalette';
 export { default as EmptyState, EmptyInfrastructure, EmptyChat, EmptyAlerts, EmptyWorkflows, EmptyActions, EmptySearch } from './EmptyState';
 export { default as HelpTooltip, PageHelp } from './HelpTooltip';
+// Alert is provided by antd, re-export for convenience
+export { Alert } from 'antd';

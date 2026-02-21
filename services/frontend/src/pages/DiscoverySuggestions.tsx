@@ -102,7 +102,7 @@ export const DiscoverySuggestions: React.FC<DiscoverySuggestionsProps> = ({
         } else if (confidence >= 0.5) {
             return <Badge variant="warning">Medium Confidence</Badge>;
         }
-        return <Badge variant="info">Low Confidence</Badge>;
+        return <Badge variant="secondary">Low Confidence</Badge>;
     };
 
     const getTypeIcon = (type: Suggestion['type']) => {
@@ -247,7 +247,7 @@ const SuggestionCard: React.FC<SuggestionCardProps> = ({
                 <div className="mt-2 flex items-center gap-2 text-xs text-gray-500">
                     <span>{suggestion.host_count} host(s)</span>
                     {suggestion.cloud_provider && (
-                        <Badge variant="info">{suggestion.cloud_provider}</Badge>
+                        <Badge variant="secondary">{suggestion.cloud_provider}</Badge>
                     )}
                 </div>
 

@@ -7,8 +7,8 @@ import {
     formatDuration,
     isWorkflowActive,
 } from '@/types/conversation';
-import { StepDetails } from './StepDetails';
-import { WorkflowControls } from './WorkflowControls';
+import StepDetails from './StepDetails';
+import WorkflowControls from './WorkflowControls';
 
 interface WorkflowProgressProps {
     workflowExecution: WorkflowExecution;
