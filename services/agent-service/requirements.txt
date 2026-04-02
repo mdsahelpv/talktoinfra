@@ -42,7 +42,7 @@ google-cloud-logging>=3.8.0
 
 # Async & Concurrency
 asyncio-mqtt==0.16.1
-aiohttp==3.9.3
+aiohttp==3.13.4
 aioredis==2.0.1
 
 # Messaging
