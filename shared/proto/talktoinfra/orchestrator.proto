@@ -1,0 +1,162 @@
+syntax = "proto3";
+
+package talktoinfra.orchestrator;
+
+option go_package = "github.com/talktoinfra/shared/proto/orchestrator";
+
+import "talktoinfra/common.proto";
+import "google/protobuf/struct.proto";
+
+// Orchestrator service - exposed to CLI / Web / Slack clients
+service OrchestratorService {
+  // Chat - send a message and stream the response
+  rpc Chat(stream ChatMessage) returns (stream ChatResponse);
+
+  // Get available tools / actions
+  rpc ListTools(ListToolsRequest) returns (ListToolsResponse);
+
+  // Session management
+  rpc CreateSession(CreateSessionRequest) returns (CreateSessionResponse);
+  rpc GetSession(GetSessionRequest) returns (GetSessionResponse);
+  rpc ListSessions(ListSessionsRequest) returns (ListSessionsResponse);
+
+  // Approve / deny a pending action
+  rpc ApproveAction(ApproveActionRequest) returns (ApproveActionResponse);
+
+  // Audit log
+  rpc GetAuditLog(GetAuditLogRequest) returns (GetAuditLogResponse);
+
+  // Health check
+  rpc Health(HealthRequest) returns (HealthResponse);
+}
+
+message ChatMessage {
+  string session_id = 1;
+  string content = 2;
+  string user_id = 3;
+}
+
+message ChatResponse {
+  oneof response_type {
+    TextChunk text = 1;
+    ToolCall tool_call = 2;
+    ToolResult tool_result = 3;
+    ApprovalRequired approval_required = 4;
+    Error error = 5;
+    SessionEnd session_end = 6;
+  }
+}
+
+message TextChunk {
+  string content = 1;
+  bool is_final = 2;
+}
+
+message ToolCall {
+  string action = 1;
+  google.protobuf.Struct parameters = 2;
+  string tool_call_id = 3;
+}
+
+message ToolResult {
+  string tool_call_id = 1;
+  bool success = 2;
+  string output = 3;
+  int32 duration_ms = 4;
+}
+
+message ApprovalRequired {
+  string approval_id = 1;
+  string action = 2;
+  google.protobuf.Struct parameters = 3;
+  talktoinfra.common.PermissionTier tier = 4;
+  string reason = 5;
+  int32 expires_seconds = 6;
+}
+
+message Error {
+  string code = 1;
+  string message = 2;
+}
+
+message SessionEnd {
+  string summary = 1;
+}
+
+message ListToolsRequest {}
+message ListToolsResponse {
+  repeated talktoinfra.common.ActionDefinition tools = 1;
+}
+
+message CreateSessionRequest {
+  string user_id = 1;
+  string description = 2;
+}
+message CreateSessionResponse {
+  string session_id = 1;
+  string created_at = 2;
+}
+
+message GetSessionRequest {
+  string session_id = 1;
+}
+message GetSessionResponse {
+  string session_id = 1;
+  string user_id = 2;
+  int32 message_count = 3;
+  string created_at = 4;
+  string last_active = 5;
+  string status = 6;
+}
+
+message ListSessionsRequest {
+  string user_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+message ListSessionsResponse {
+  repeated GetSessionResponse sessions = 1;
+  int32 total = 2;
+}
+
+message ApproveActionRequest {
+  string approval_id = 1;
+  bool approved = 2;
+  string user_id = 3;
+  string note = 4;
+}
+message ApproveActionResponse {
+  bool success = 1;
+  string tool_call_id = 2;
+}
+
+message GetAuditLogRequest {
+  string session_id = 1;
+  int32 limit = 2;
+  int32 offset = 3;
+}
+message GetAuditLogResponse {
+  repeated AuditEntry entries = 1;
+  int32 total = 2;
+}
+
+message AuditEntry {
+  string id = 1;
+  string action = 2;
+  bool approved = 3;
+  string approved_by = 4;
+  string status = 5;
+  google.protobuf.Timestamp timestamp = 6;
+  string result = 7;
+}
+
+message HealthRequest {
+  string service = 1;
+}
+message HealthResponse {
+  string service = 1;
+  string version = 2;
+  bool healthy = 3;
+  map<string, bool> dependencies = 4;
+  int32 uptime_seconds = 5;
+}

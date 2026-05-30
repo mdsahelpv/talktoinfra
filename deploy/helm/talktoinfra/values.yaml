@@ -1,0 +1,145 @@
+# TalkToInfra Helm values
+# Override these values to configure your deployment
+
+global:
+  imageRegistry: ""
+  imageTag: "latest"
+  environment: production
+
+orchestrator:
+  replicaCount: 2
+  image:
+    repository: talktoinfra/orchestrator
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 8000
+  resources:
+    requests:
+      cpu: 500m
+      memory: 512Mi
+    limits:
+      cpu: 2
+      memory: 2Gi
+  config:
+    app_name: "TalkToInfra Orchestrator"
+    debug: false
+    cors_origins: "*"
+    default_llm_provider: "ollama"
+    ollama_base_url: "http://ollama:11434"
+    ollama_model: "llama3"
+    database_url: "sqlite+aiosqlite:///data/talktoinfra.db"
+    enable_auth: false
+    api_supported_versions: "1.0"
+    air_gapped: false
+  env: []
+  envFrom: []
+
+agent:
+  replicaCount: 3
+  image:
+    repository: talktoinfra/agent
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 9000
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 1Gi
+  config:
+    orchestrator_url: "http://talktoinfra-orchestrator:8000"
+  env: []
+  envFrom: []
+
+web:
+  replicaCount: 2
+  image:
+    repository: talktoinfra/web
+    tag: ""
+    pullPolicy: IfNotPresent
+  service:
+    type: ClusterIP
+    port: 3000
+  resources:
+    requests:
+      cpu: 200m
+      memory: 256Mi
+    limits:
+      cpu: 500m
+      memory: 512Mi
+  config: {}
+  env: []
+  envFrom: []
+
+ingress:
+  enabled: false
+  className: ""
+  annotations: {}
+  hosts:
+    - host: talktoinfra.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+  #  - secretName: talktoinfra-tls
+  #    hosts:
+  #      - talktoinfra.local
+
+autoscaling:
+  enabled: false
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+  queueDepthThreshold: 100
+
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+serviceAccount:
+  create: true
+  name: "talktoinfra"
+  annotations: {}
+
+rbac:
+  create: true
+
+networkPolicy:
+  enabled: true
+
+podSecurityPolicy:
+  enabled: true
+
+secrets:
+  jwtSecret: "change-me-in-production"
+  apiKeys: ""
+  openaiApiKey: ""
+  anthropicApiKey: ""
+  databaseUrl: ""
+
+postgresql:
+  enabled: false
+  auth:
+    database: talktoinfra
+    username: talktoinfra
+    password: ""
+  primary:
+    persistence:
+      size: 10Gi
+
+ollama:
+  enabled: false
+  image:
+    repository: ollama/ollama
+    tag: latest
+  persistence:
+    size: 50Gi
+
+extraResources: []

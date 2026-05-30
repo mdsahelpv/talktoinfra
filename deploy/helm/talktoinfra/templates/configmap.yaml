@@ -1,0 +1,19 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "talktoinfra.fullname" . }}-config
+  labels:
+    {{- include "talktoinfra.labels" . | nindent 4 }}
+data:
+  TALKTOINFRA_APP_NAME: {{ .Values.orchestrator.config.app_name | quote }}
+  TALKTOINFRA_DEBUG: {{ .Values.orchestrator.config.debug | quote }}
+  TALKTOINFRA_CORS_ORIGINS: {{ .Values.orchestrator.config.cors_origins | quote }}
+  TALKTOINFRA_DEFAULT_LLM_PROVIDER: {{ .Values.orchestrator.config.default_llm_provider | quote }}
+  TALKTOINFRA_OLLAMA_BASE_URL: {{ .Values.orchestrator.config.ollama_base_url | quote }}
+  TALKTOINFRA_OLLAMA_MODEL: {{ .Values.orchestrator.config.ollama_model | quote }}
+  TALKTOINFRA_DATABASE_URL: {{ .Values.orchestrator.config.database_url | quote }}
+  TALKTOINFRA_ENABLE_AUTH: {{ .Values.orchestrator.config.enable_auth | quote }}
+  TALKTOINFRA_API_SUPPORTED_VERSIONS: {{ .Values.orchestrator.config.api_supported_versions | quote }}
+  TALKTOINFRA_AIR_GAPPED: {{ .Values.orchestrator.config.air_gapped | quote }}
+  TALKTOINFRA_HEARTBEAT_SLA_SECONDS: "{{ .Values.orchestrator.config.heartbeat_sla_seconds }}"
+  ORCHESTRATOR_URL: {{ .Values.agent.config.orchestrator_url | quote }}

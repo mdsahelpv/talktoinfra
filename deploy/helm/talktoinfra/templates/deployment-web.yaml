@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "talktoinfra.fullname" . }}-web
+  labels:
+    {{- include "talktoinfra.labels" . | nindent 4 }}
+    app.kubernetes.io/component: web
+spec:
+  replicas: {{ .Values.web.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ include "talktoinfra.name" . }}
+      app.kubernetes.io/component: web
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: {{ include "talktoinfra.name" . }}
+        app.kubernetes.io/component: web
+    spec:
+      {{- include "talktoinfra.imagePullSecret" . | nindent 6 }}
+      serviceAccountName: {{ include "talktoinfra.serviceAccountName" . }}
+      containers:
+        - name: web
+          image: "{{ .Values.global.imageRegistry }}/{{ .Values.web.image.repository }}:{{ .Values.web.image.tag | default .Values.global.imageTag }}"
+          imagePullPolicy: {{ .Values.web.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.web.service.port }}
+              protocol: TCP
+          envFrom:
+            - configMapRef:
+                name: {{ include "talktoinfra.fullname" . }}-config
+            - secretRef:
+                name: {{ include "talktoinfra.fullname" . }}-secrets
+          {{- with .Values.web.env }}
+          env:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          resources:
+            {{- toYaml .Values.web.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1002

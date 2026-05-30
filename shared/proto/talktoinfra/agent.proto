@@ -1,0 +1,64 @@
+syntax = "proto3";
+
+package talktoinfra.agent;
+
+option go_package = "github.com/talktoinfra/shared/proto/agent";
+
+import "talktoinfra/common.proto";
+
+// Agent service - runs in-cluster, called by orchestrator
+service AgentService {
+  // Execute a tool call
+  rpc ExecuteTool(talktoinfra.common.ToolCallRequest) returns (talktoinfra.common.ToolCallResponse);
+
+  // Report health / status
+  rpc ReportHealth(talktoinfra.common.AgentHealth) returns (HealthAck);
+
+  // List available actions
+  rpc ListActions(Empty) returns (ListActionsResponse);
+
+  // Stream tool execution logs
+  rpc StreamExecution(talktoinfra.common.ToolCallRequest) returns (stream ExecutionEvent);
+}
+
+message HealthAck {
+  bool accepted = 1;
+  int64 server_time = 2;
+}
+
+message ListActionsResponse {
+  repeated talktoinfra.common.ActionDefinition actions = 1;
+  string agent_version = 2;
+}
+
+message ExecutionEvent {
+  string tool_call_id = 1;
+  oneof event {
+    LogLine log = 2;
+    PartialOutput output = 3;
+    ExecutionError error = 4;
+    ExecutionComplete complete = 5;
+  }
+}
+
+message LogLine {
+  string line = 1;
+  int32 stream = 2; // 0=stdout, 1=stderr
+}
+
+message PartialOutput {
+  string content = 1;
+  bool is_final = 2;
+}
+
+message ExecutionError {
+  string code = 1;
+  string message = 2;
+}
+
+message ExecutionComplete {
+  string summary = 1;
+  int32 duration_ms = 2;
+}
+
+message Empty {}

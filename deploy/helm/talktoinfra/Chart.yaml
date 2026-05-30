@@ -1,0 +1,13 @@
+apiVersion: v2
+name: talktoinfra
+description: A Helm chart for TalkToInfra — AI infrastructure copilot
+type: application
+version: 0.1.0
+appVersion: "0.1.0"
+keywords:
+  - infrastructure
+  - ai
+  - copilot
+  - devops
+sources:
+  - https://github.com/anomalyco/talktoinfra

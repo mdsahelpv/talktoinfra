@@ -1,0 +1,53 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+dist/
+build/
+.venv/
+venv/
+*.egg
+.Python
+
+# Environment
+.env
+.env.local
+.env.*.local
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Project
+*.db
+*.sqlite3
+*.log
+orchestrator/data/
+agent/data/
+cli/data/
+
+# Node
+node_modules/
+web/dist/
+.next/
+
+# Helm
+deploy/helm/**/charts/
+deploy/helm/**/*.tgz
+
+# Testing
+.coverage
+htmlcov/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Docker
+.docker/

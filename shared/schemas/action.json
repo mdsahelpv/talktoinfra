@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ActionCatalog",
+  "description": "Schema for the TalkToInfra action catalog",
+  "type": "object",
+  "additionalProperties": {
+    "type": "object",
+    "properties": {
+      "name": { "type": "string", "description": "Unique action name e.g. k8s_get_pods" },
+      "description": { "type": "string", "description": "Human-readable description" },
+      "category": {
+        "type": "string",
+        "enum": ["kubernetes", "cloud", "network", "ad", "onprem", "database", "monitoring"]
+      },
+      "tier": {
+        "type": "string",
+        "enum": ["read", "mutate", "destructive"],
+        "description": "Permission tier required"
+      },
+      "timeout_seconds": { "type": "integer", "minimum": 1, "default": 30 },
+      "parameters": {
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "name": { "type": "string" },
+            "type": { "type": "string", "enum": ["string", "integer", "boolean", "array", "object"] },
+            "required": { "type": "boolean", "default": false },
+            "description": { "type": "string" },
+            "default": {},
+            "enum": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          },
+          "required": ["name", "type"]
+        }
+      },
+      "output_schema": {
+        "type": "object",
+        "description": "JSON Schema for the action's output"
+      }
+    },
+    "required": ["name", "description", "category", "tier", "parameters"]
+  }
+}

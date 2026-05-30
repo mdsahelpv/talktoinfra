@@ -1,0 +1,53 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "ToolCallIO",
+  "description": "Schema for tool call request/response between orchestrator and agent",
+  "definitions": {
+    "ToolCallRequest": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "action": { "type": "string" },
+        "parameters": { "type": "object" },
+        "correlation_id": { "type": "string", "format": "uuid" },
+        "timestamp": { "type": "string", "format": "date-time" }
+      },
+      "required": ["id", "action", "parameters", "correlation_id"]
+    },
+    "ToolCallResponse": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string", "format": "uuid" },
+        "success": { "type": "boolean" },
+        "output": {},
+        "error": { "type": "string" },
+        "duration_ms": { "type": "integer" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "truncated": { "type": "boolean", "default": false }
+      },
+      "required": ["id", "success"]
+    },
+    "ApprovalRequest": {
+      "type": "object",
+      "properties": {
+        "action": { "type": "string" },
+        "parameters": { "type": "object" },
+        "tier": { "type": "string", "enum": ["mutate", "destructive"] },
+        "reason": { "type": "string" },
+        "session_id": { "type": "string", "format": "uuid" },
+        "expires_at": { "type": "string", "format": "date-time" }
+      },
+      "required": ["action", "parameters", "tier"]
+    },
+    "ApprovalResponse": {
+      "type": "object",
+      "properties": {
+        "approved": { "type": "boolean" },
+        "approved_by": { "type": "string" },
+        "timestamp": { "type": "string", "format": "date-time" },
+        "note": { "type": "string" }
+      },
+      "required": ["approved", "approved_by"]
+    }
+  }
+}

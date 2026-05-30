@@ -1,0 +1,73 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: talktoinfra
+      POSTGRES_USER: talktoinfra
+      POSTGRES_PASSWORD: talktoinfra
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U talktoinfra"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    restart: unless-stopped
+
+  orchestrator:
+    build:
+      context: .
+      dockerfile: orchestrator/Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      TALKTOINFRA_DATABASE_URL: "postgresql+asyncpg://talktoinfra:talktoinfra@postgres:5432/talktoinfra"
+      TALKTOINFRA_DEBUG: "true"
+      TALKTOINFRA_ENABLE_AUTH: "false"
+      TALKTOINFRA_APP_VERSION: "0.1.0"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+  agent:
+    build:
+      context: .
+      dockerfile: agent/Dockerfile
+    environment:
+      TALKTOINFRA_AGENT_ORCHESTRATOR_URL: "http://orchestrator:8000"
+      TALKTOINFRA_AGENT_K8S_ENABLED: "true"
+      TALKTOINFRA_AGENT_AWS_ENABLED: "false"
+      TALKTOINFRA_AGENT_DNS_ENABLED: "true"
+      TALKTOINFRA_AGENT_AD_ENABLED: "false"
+      TALKTOINFRA_AGENT_SSH_ENABLED: "false"
+    depends_on:
+      orchestrator:
+        condition: service_started
+    restart: unless-stopped
+
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    ports:
+      - "5173:80"
+    depends_on:
+      orchestrator:
+        condition: service_started
+    restart: unless-stopped
+
+  cli:
+    build:
+      context: .
+      dockerfile: cli/Dockerfile
+    profiles:
+      - cli
+    depends_on:
+      orchestrator:
+        condition: service_started
+
+volumes:
+  postgres_data:
