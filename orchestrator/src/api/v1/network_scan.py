@@ -3,7 +3,9 @@ from pydantic import BaseModel
 
 from src.auth.deps import require_permission, AuthContext
 from src.auth.rbac import Permission
-from src.discovery.network_scanner import scanner, QUICK_PORTS, SERVICE_MAP
+from src.discovery.network_scanner import scanner, SERVICE_MAP
+
+QUICK_PORTS = [22, 80, 443, 445, 8080, 8443, 8000, 3306, 5432, 6379, 27017, 6443, 9090, 3000, 3389]
 
 router = APIRouter()
 
@@ -16,6 +18,12 @@ class ScanRequest(BaseModel):
 class DeployRequest(BaseModel):
     job_id: str
     host_ips: list[str]
+
+
+class PublishResult(BaseModel):
+    cidr: str
+    hosts: list[dict]
+    scanned_from: str = "cli"
 
 
 @router.post("/network-scan")
@@ -75,7 +83,7 @@ async def list_common_ports(
 ):
     groups = {
         "SSH": [22],
-        "Web": [80, 443, 8080, 8443],
+        "Web": [80, 443, 8080, 8443, 8000],
         "Databases": [3306, 5432, 6379, 27017, 1433, 1521],
         "Kubernetes": [6443, 2379, 2380, 10250, 10255],
         "Monitoring": [9090, 3000, 9100, 5601, 9200],
@@ -87,6 +95,50 @@ async def list_common_ports(
         "groups": groups,
         "quick_ports": QUICK_PORTS,
     }
+
+
+@router.get("/network-scan")
+async def list_scan_jobs(
+    auth: AuthContext = Depends(require_permission(Permission.AGENT_READ)),
+):
+    jobs = []
+    for jid, job in scanner._jobs.items():
+        jobs.append({
+            "job_id": jid,
+            "cidr": job.cidr,
+            "status": job.status,
+            "hosts_found": len(job.hosts),
+            "created_at": job.created_at,
+            "completed_at": job.completed_at,
+        })
+    jobs.sort(key=lambda j: j["created_at"], reverse=True)
+    return {"jobs": jobs, "total": len(jobs)}
+
+
+@router.post("/network-scan/publish")
+async def publish_scan_results(
+    req: PublishResult,
+    auth: AuthContext = Depends(require_permission(Permission.AGENT_READ)),
+):
+    from src.discovery.network_scanner import DiscoveredHost, DiscoveredPort, ScanJob
+    import time
+    hosts = []
+    for h in req.hosts:
+        ports = [DiscoveredPort(port=p["port"], service=p.get("service", "unknown")) for p in h.get("ports", [])]
+        hosts.append(DiscoveredHost(ip=h["ip"], hostname=h.get("hostname", ""), status="up", ports=ports))
+    job = ScanJob(
+        id=f"published_{int(time.time())}",
+        cidr=req.cidr,
+        status="completed",
+        progress=100,
+        total_hosts=0,
+        scanned_hosts=0,
+        hosts=hosts,
+        created_at=time.time(),
+        completed_at=time.time(),
+    )
+    scanner._jobs[job.id] = job
+    return {"job_id": job.id, "hosts_found": len(hosts), "status": "published"}
 
 
 @router.post("/network-scan/{job_id}/deploy-agent")

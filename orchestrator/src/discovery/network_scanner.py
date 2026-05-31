@@ -14,7 +14,7 @@ SERVICE_MAP = {
     3000: "Grafana/Node-exporter", 3306: "MySQL",
     3389: "RDP", 5432: "PostgreSQL", 5601: "Kibana",
     5900: "VNC", 6379: "Redis", 6443: "K8s API",
-    8080: "HTTP-Alt", 8443: "HTTPS-Alt", 9000: "Portainer/SonarQube",
+    8080: "HTTP-Alt", 8443: "HTTPS-Alt", 8000: "Orchestrator", 9000: "Portainer/SonarQube",
     9090: "Prometheus", 9100: "Node-Exporter", 9200: "Elasticsearch",
     10250: "K8s Kubelet", 10255: "K8s Kubelet-RO", 27017: "MongoDB",
 }

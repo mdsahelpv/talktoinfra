@@ -8,6 +8,7 @@ from talktoinfra_cli.commands.session import session_cmd
 from talktoinfra_cli.commands.status import status_cmd
 from talktoinfra_cli.commands.history import history_cmd
 from talktoinfra_cli.commands.config import config_cmd
+from talktoinfra_cli.commands.netscan import netscan_cmd
 
 
 @click.group()
@@ -25,6 +26,7 @@ cli.add_command(session_cmd)
 cli.add_command(status_cmd)
 cli.add_command(history_cmd)
 cli.add_command(config_cmd)
+cli.add_command(netscan_cmd)
 
 if __name__ == "__main__":
     cli()
