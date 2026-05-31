@@ -4,6 +4,8 @@ import { Link, useLocation } from 'react-router-dom'
 const navItems = [
   { path: '/', label: 'Chat', icon: '💬' },
   { path: '/dashboard', label: 'Dashboard', icon: '📊' },
+  { path: '/discover', label: 'Discover', icon: '🔍' },
+  { path: '/network-scan', label: 'Network Scan', icon: '📡' },
   { path: '/sessions', label: 'Sessions', icon: '📋' },
   { path: '/audit', label: 'Audit', icon: '📜' },
 ]

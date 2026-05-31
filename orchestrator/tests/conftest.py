@@ -7,7 +7,7 @@ from pathlib import Path
 
 # Register shared package (PathFinder can't resolve it from sys.path
 # due to editable-install path-hook placeholder entries).
-_shared_root = Path(__file__).resolve().parent.parent.parent / "shared"
+_shared_root = Path(__file__).resolve().parent.parent.parent / "shared" / "shared"
 _init_file = _shared_root / "__init__.py"
 if _init_file.exists() and "shared" not in sys.modules:
     _spec = importlib.util.spec_from_file_location(

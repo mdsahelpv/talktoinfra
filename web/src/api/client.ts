@@ -43,4 +43,36 @@ export const api = {
   },
 
   health: () => request<{ service: string; version: string; healthy: boolean }>('/health'),
+
+  discover: {
+    scan: () => request<{ scan: Record<string, any>; total_agents: number; scan_timestamp: string | null }>('/discover/scan'),
+    summary: () => request<{ total_categories: number; total_resources: number; categories: any[] }>('/discover/summary'),
+  },
+
+  networkScan: {
+    start: (cidr: string, ports?: number[]) =>
+      request<{ job_id: string; cidr: string; status: string; total_hosts: number }>('/network-scan', {
+        method: 'POST',
+        body: JSON.stringify({ cidr, ports }),
+      }),
+    status: (jobId: string) =>
+      request<{
+        job_id: string; cidr: string; status: string; progress: number;
+        total_hosts: number; scanned_hosts: number; hosts_found: number;
+        hosts: Array<{ ip: string; hostname: string; status: string; ports: Array<{ port: number; service: string; state: string }> }>;
+        created_at: number; completed_at: number | null; error: string;
+      }>(`/network-scan/${jobId}`),
+    ports: () =>
+      request<{ ports: Array<{ port: number; service: string }>; groups: Record<string, number[]>; quick_ports: number[] }>('/network-scan/ports/common'),
+    deployAgent: (jobId: string, hostIps: string[]) =>
+      request<any>(`/network-scan/${jobId}/deploy-agent`, {
+        method: 'POST',
+        body: JSON.stringify({ job_id: jobId, host_ips: hostIps }),
+      }),
+    connectAgentless: (jobId: string, hostIps: string[]) =>
+      request<any>(`/network-scan/${jobId}/connect-agentless`, {
+        method: 'POST',
+        body: JSON.stringify({ job_id: jobId, host_ips: hostIps }),
+      }),
+  },
 }

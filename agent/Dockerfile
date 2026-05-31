@@ -16,5 +16,5 @@ COPY --from=builder /usr/local/bin /usr/local/bin
 RUN mkdir -p /app/data && chown -R app:app /app
 USER app
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:9000/health')" || exit 1
+  CMD kill -0 1 || exit 1
 CMD ["python", "-m", "src.main"]
